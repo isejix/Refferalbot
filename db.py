@@ -1,0 +1,296 @@
+import aiosqlite
+import asyncio
+
+async def create_database():
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS admin (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userid INTEGER,
+                role INTEGER DEFAULT 0,
+                accesstypeid INTEGER DEFAULT 0,
+                fname varchar
+            );
+        """)
+        
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS accesstype (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userid BIGINT NOT NULL,
+                addadmin BIT DEFAULT 0,
+                deleteadmin BIT DEFAULT 0,
+                wallet BIT DEFAULT 0,
+                ban BIGINT BIT DEFAULT 0,
+                unban BIT DEFAULT 0
+            );
+        """)
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userid BIGINT NOT NULL,
+                walletus INTEGER DEFAULT 0,
+                referralid BIGINT,
+                score INTEGER DEFAULT 10,
+                fname varchar,
+                block BIT DEFAULT 0
+            );
+        """)
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS wallet (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userid BIGINT NOT NULL,
+                balance BIGINT DEFAULT 0
+            );
+        """)
+
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS referrabots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                botname varchar,
+                username varchar,
+                referralid BIGINT NOT NULL
+            );
+        """)
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS price (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                referralid BIGINT NOT NULL,
+                price BIGINT NOT NULL
+            );
+        """)
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS accounts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sessions BIGINT NOT NULL,
+                status BIT DEFAULT 0,
+                referralid BIGINT NOT NULL
+            );
+        """)
+
+        await db.commit()
+
+
+# ------------------------------- CRUD for 'admin' Table -------------------------------
+async def create_admin(userid, role, accesstypeid, fname):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute(
+            """
+            INSERT INTO admin (userid, role, accesstypeid, fname)
+            VALUES (?, ?, ?, ?);
+            """,
+            (userid, role, accesstypeid, fname),
+        )
+        await db.commit()
+
+async def read_admins():
+    async with aiosqlite.connect("database.db") as db:
+        async with db.execute("SELECT * FROM admin") as cursor:
+            return await cursor.fetchall()
+        
+async def ReadAdmin(AdminId):
+    async with aiosqlite.connect("database.db") as conn:
+        Cursor = await conn.execute("""
+            SELECT * FROM admin
+            WHERE UserId = ?
+            """, (AdminId,))
+        return await Cursor.fetchone()
+    
+async def UpdateScoreUser(UserId: int, Score : int):
+    async with aiosqlite.connect("database.db") as conn:
+        await conn.execute(
+            f"""
+                UPDATE user SET Score = ? WHERE UserId = ?
+            """,
+            (Score,str(UserId)),
+        )
+        await conn.commit()
+        
+async def update_admin(id, role=None, accesstypeid=None, fname=None):
+    async with aiosqlite.connect("database.db") as db:
+        if role:
+            await db.execute("UPDATE admin SET role = ? WHERE id = ?;", (role, id))
+        if accesstypeid:
+            await db.execute("UPDATE admin SET accesstypeid = ? WHERE id = ?;", (accesstypeid, id))
+        if fname:
+            await db.execute("UPDATE admin SET fname = ? WHERE id = ?;", (fname, id))
+        await db.commit()
+
+async def delete_admin(id):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("DELETE FROM admin WHERE id = ?;", (id,))
+        await db.commit()
+
+# ------------------------------- CRUD for 'accesstype' Table -------------------------------
+async def create_accesstype(userid, addadmin, deleteadmin, wallet, ban, unban):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute(
+            """
+            INSERT INTO accesstype (userid, addadmin, deleteadmin, wallet, ban, unban)
+            VALUES (?, ?, ?, ?, ?, ?);
+            """,
+            (userid, addadmin, deleteadmin, wallet, ban, unban),
+        )
+        await db.commit()
+
+async def read_accesstypes():
+    async with aiosqlite.connect("database.db") as db:
+        async with db.execute("SELECT * FROM accesstype;") as cursor:
+            return await cursor.fetchall()
+        
+async def ReadAccessTypesByUserId(UserId):
+    async with aiosqlite.connect("database.db") as conn:
+        Cursor = await conn.execute("""
+            SELECT * FROM accesstype
+            WHERE UserId = ?
+            """, (UserId,))
+        return await Cursor.fetchone()
+    
+async def update_accesstype(id, addadmin=None, deleteadmin=None, wallet=None, ban=None, unban=None):
+    async with aiosqlite.connect("database.db") as db:
+        if addadmin is not None:
+            await db.execute("UPDATE accesstype SET addadmin = ? WHERE id = ?;", (addadmin, id))
+        if deleteadmin is not None:
+            await db.execute("UPDATE accesstype SET deleteadmin = ? WHERE id = ?;", (deleteadmin, id))
+        if wallet is not None:
+            await db.execute("UPDATE accesstype SET wallet = ? WHERE id = ?;", (wallet, id))
+        if ban is not None:
+            await db.execute("UPDATE accesstype SET ban = ? WHERE id = ?;", (ban, id))
+        if unban is not None:
+            await db.execute("UPDATE accesstype SET unban = ? WHERE id = ?;", (unban, id))
+        await db.commit()
+
+async def delete_accesstype(id):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("DELETE FROM accesstype WHERE id = ?;", (id,))
+        await db.commit()
+
+# ------------------------------- CRUD for 'user' Table -------------------------------
+async def create_user(userid, walletus, referralid, score, fname, block):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute(
+            """
+            INSERT INTO user (userid, walletus, referralid, score, fname, block)
+            VALUES (?, ?, ?, ?, ?, ?);
+            """,
+            (userid, walletus, referralid, score, fname, block),
+        )
+        await db.commit()
+
+async def read_users():
+    async with aiosqlite.connect("database.db") as db:
+        async with db.execute("SELECT * FROM user;") as cursor:
+            return await cursor.fetchall()
+        
+async def ReadUserByUserId(UserId):
+    async with aiosqlite.connect("database.db") as conn:
+        Cursor = await conn.execute("""
+            SELECT * FROM user
+            WHERE UserId = ?
+            """, (str(UserId),))
+        return await Cursor.fetchone()
+
+async def update_user(id, walletus=None, referralid=None, score=None, block=None):
+    async with aiosqlite.connect("database.db") as db:
+        if walletus is not None:
+            await db.execute("UPDATE user SET walletus = ? WHERE id = ?;", (walletus, id))
+        if referralid is not None:
+            await db.execute("UPDATE user SET referralid = ? WHERE id = ?;", (referralid, id))
+        if score is not None:
+            await db.execute("UPDATE user SET score = ? WHERE id = ?;", (score, id))
+        if block is not None:
+            await db.execute("UPDATE user SET block = ? WHERE id = ?;", (block, id))
+        await db.commit()
+
+async def delete_user(id):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("DELETE FROM user WHERE id = ?;", (id,))
+        await db.commit()
+
+# ------------------------------- CRUD for 'wallet' Table -------------------------------
+async def create_wallet(userid, balance):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute(
+            """
+            INSERT INTO wallet (userid, balance)
+            VALUES (?, ?);
+            """,
+            (userid, balance),
+        )
+        await db.commit()
+
+async def read_wallets():
+    async with aiosqlite.connect("database.db") as db:
+        async with db.execute("SELECT * FROM wallet;") as cursor:
+            return await cursor.fetchall()
+
+async def update_wallet(id, balance):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("UPDATE wallet SET balance = ? WHERE id = ?;", (balance, id))
+        await db.commit()
+
+async def delete_wallet(id):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("DELETE FROM wallet WHERE id = ?;", (id,))
+        await db.commit()
+
+# ------------------------------- CRUD for 'referrabots' Table -------------------------------
+async def create_referrabot(botname, username, referralid):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute(
+            """
+            INSERT INTO referrabots (botname, username, referralid)
+            VALUES (?, ?, ?);
+            """,
+            (botname, username, referralid),
+        )
+        await db.commit()
+
+async def read_referrabots():
+    async with aiosqlite.connect("database.db") as db:
+        async with db.execute("SELECT * FROM referrabots;") as cursor:
+            return await cursor.fetchall()
+
+async def update_referrabot(id, botname=None, username=None):
+    async with aiosqlite.connect("database.db") as db:
+        if botname is not None:
+            await db.execute("UPDATE referrabots SET botname = ? WHERE id = ?;", (botname, id))
+        if username is not None:
+            await db.execute("UPDATE referrabots SET username = ? WHERE id = ?;", (username, id))
+        await db.commit()
+
+async def delete_referrabot(id):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("DELETE FROM referrabots WHERE id = ?;", (id,))
+        await db.commit()
+
+# ------------------------------- CRUD for 'price' Table -------------------------------
+async def create_price(referralid, price):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute(
+            """
+            INSERT INTO price (referralid, price)
+            VALUES (?, ?);
+            """,
+            (referralid, price),
+        )
+        await db.commit()
+
+async def read_prices():
+    async with aiosqlite.connect("database.db") as db:
+        async with db.execute("SELECT * FROM price;") as cursor:
+            return await cursor.fetchall()
+
+async def update_price(id, price):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("UPDATE price SET price = ? WHERE id = ?;", (price, id))
+        await db.commit()
+
+async def delete_price(id):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("DELETE FROM price WHERE id = ?;", (id,))
+        await db.commit()
