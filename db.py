@@ -20,8 +20,8 @@ async def create_database():
                 addadmin BIT DEFAULT 0,
                 deleteadmin BIT DEFAULT 0,
                 wallet BIT DEFAULT 0,
-                ban BIGINT BIT DEFAULT 0,
-                unban BIT DEFAULT 0
+                uploadsession BIGINT BIT DEFAULT 0,
+                updatebalance BIT DEFAULT 0
             );
         """)
 
@@ -29,10 +29,11 @@ async def create_database():
             CREATE TABLE IF NOT EXISTS user (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 userid BIGINT NOT NULL,
+                fname varchar,
+                username varchar,
                 walletus INTEGER DEFAULT 0,
                 referralid BIGINT,
                 score INTEGER DEFAULT 10,
-                fname varchar,
                 block BIT DEFAULT 0
             );
         """)
@@ -126,14 +127,14 @@ async def delete_admin(id):
         await db.commit()
 
 # ------------------------------- CRUD for 'accesstype' Table -------------------------------
-async def create_accesstype(userid, addadmin, deleteadmin, wallet, ban, unban):
+async def create_accesstype(userid, addadmin, deleteadmin, wallet, uploadsession, updatebalance):
     async with aiosqlite.connect("database.db") as db:
         await db.execute(
             """
-            INSERT INTO accesstype (userid, addadmin, deleteadmin, wallet, ban, unban)
+            INSERT INTO accesstype (userid, addadmin, deleteadmin, wallet, uploadsession, updatebalance)
             VALUES (?, ?, ?, ?, ?, ?);
             """,
-            (userid, addadmin, deleteadmin, wallet, ban, unban),
+            (userid, addadmin, deleteadmin, wallet, uploadsession, updatebalance),
         )
         await db.commit()
 
@@ -150,7 +151,7 @@ async def ReadAccessTypesByUserId(UserId):
             """, (UserId,))
         return await Cursor.fetchone()
     
-async def update_accesstype(id, addadmin=None, deleteadmin=None, wallet=None, ban=None, unban=None):
+async def update_accesstype(id, addadmin=None, deleteadmin=None, wallet=None, uploadsession=None, updatebalance=None):
     async with aiosqlite.connect("database.db") as db:
         if addadmin is not None:
             await db.execute("UPDATE accesstype SET addadmin = ? WHERE id = ?;", (addadmin, id))
@@ -158,10 +159,10 @@ async def update_accesstype(id, addadmin=None, deleteadmin=None, wallet=None, ba
             await db.execute("UPDATE accesstype SET deleteadmin = ? WHERE id = ?;", (deleteadmin, id))
         if wallet is not None:
             await db.execute("UPDATE accesstype SET wallet = ? WHERE id = ?;", (wallet, id))
-        if ban is not None:
-            await db.execute("UPDATE accesstype SET ban = ? WHERE id = ?;", (ban, id))
-        if unban is not None:
-            await db.execute("UPDATE accesstype SET unban = ? WHERE id = ?;", (unban, id))
+        if uploadsession is not None:
+            await db.execute("UPDATE accesstype SET uploadsession = ? WHERE id = ?;", (uploadsession, id))
+        if updatebalance is not None:
+            await db.execute("UPDATE accesstype SET updatebalance = ? WHERE id = ?;", (updatebalance, id))
         await db.commit()
 
 async def delete_accesstype(id):
@@ -170,14 +171,14 @@ async def delete_accesstype(id):
         await db.commit()
 
 # ------------------------------- CRUD for 'user' Table -------------------------------
-async def create_user(userid, walletus, referralid, score, fname, block):
+async def create_user(userid, fname, username ,walletus, referralid, score, block):
     async with aiosqlite.connect("database.db") as db:
         await db.execute(
             """
-            INSERT INTO user (userid, walletus, referralid, score, fname, block)
-            VALUES (?, ?, ?, ?, ?, ?);
+            INSERT INTO user (userid, fname, username, walletus, referralid, score, block)
+            VALUES (?, ?, ?, ?, ?, ?, ?);
             """,
-            (userid, walletus, referralid, score, fname, block),
+            (userid, fname, username, walletus, referralid, score, block),
         )
         await db.commit()
 
@@ -193,7 +194,27 @@ async def ReadUserByUserId(UserId):
             WHERE UserId = ?
             """, (str(UserId),))
         return await Cursor.fetchone()
-
+    
+async def ReadWalletUser(UserId):
+    async with aiosqlite.connect("database.db") as conn:
+        Cursor = await conn.execute("""
+            SELECT walletus FROM user
+            WHERE UserId = ?
+            """, (str(UserId),))
+        result =  await Cursor.fetchall()
+        if result:
+                return result[0]
+    
+async def UpdateWalletUser(UserId: int, walletus : int):
+    async with aiosqlite.connect("database.db") as conn:
+        await conn.execute(
+            f"""
+                UPDATE user SET walletus = ? WHERE UserId = ?
+            """,
+            (walletus,str(UserId)),
+        )
+        await conn.commit()
+        
 async def update_user(id, walletus=None, referralid=None, score=None, block=None):
     async with aiosqlite.connect("database.db") as db:
         if walletus is not None:
