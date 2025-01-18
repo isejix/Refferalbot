@@ -100,11 +100,42 @@ async def start_bot(event):
 @client.on(events.NewMessage(pattern="افزایش موجودی 👛"))
 async def start_bot(event):
     userid = event.sender_id
-    await client.send_message(
-                            userid,
-                            ConstText.charg_acc
-                        )
+    keyboard = keys.how_pay()
+    await event.respond(ConstText.charg_acc,buttons=keyboard)
 
+@client.on(events.NewMessage(pattern="💵 درگاه بانکی"))
+async def pay_dargah(event):
+    userid = event.sender_id
+    global user_cach, user_step
+    user_step[userid] = "cash"
+    
+    # Ensure user_cach[userid] is a dictionary
+    user_cach[userid] = {}
+    
+    keyboard = keys.cancel()
+    await event.respond("💶 جهت افزایش موجودی حساب مبلغ مورد نظرخود را به تومان وارد نمایید:", buttons=keyboard)
+
+@client.on(events.NewMessage())
+async def process_pay_dargah(event):
+    user_id = event.sender_id
+    if user_id not in user_step:
+        return
+
+    current_step = user_step[user_id]
+    cash = float(event.text)
+
+    if current_step == "cash":
+        if user_id not in user_cach:
+            user_cach[user_id] = {}
+        user_cach[user_id]["cash"] = cash
+        
+        await event.reply(
+            f"💳 فاکتور افزایش موجودی به مبلغ {user_cach[user_id]['cash']} تومان صادر گردید.\n"
+            "👈 درصورتی که مورد تاییدتان است با انتخاب یکی از گزینه های زیر پرداخت خود را انجام دهید",
+            buttons=keys.pay_dargah(user_cach[user_id]["cash"])
+        )
+
+    
 @client.on(events.NewMessage(pattern="قوانین و راهنما 💡"))
 async def start_bot(event):
     userid = event.sender_id

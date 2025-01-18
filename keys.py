@@ -1,5 +1,5 @@
 from telethon import Button
-from telethon.tl.types import KeyboardButton, ReplyKeyboardMarkup
+import pay
 
 def key_start_user():
     
@@ -34,13 +34,29 @@ def cancel():
     back =  Button.text("انصراف ❌", resize=True)
     return [[back]] 
 
-
 def Back_Reply():
     keyboard = [
         [Button.text("بازگشت", resize=True, single_use=False, selective=False)]
     ]
     return keyboard
 
+def how_pay():
+    keyboard = [
+        [Button.text("💵 درگاه بانکی", resize=True),Button.text("پرداخت مستقیم", resize=True)],
+        [Button.text("بازگشت", resize=True, single_use=False, selective=False)]
+    ]
+    return keyboard
+
+def pay_dargah(amount: float):
+    try:
+        payment_url = pay.link_payment(amount)
+        keyboard = [
+            [Button.url("درگاه پرداخت 🛍", url=payment_url), Button.inline("بازگشت", data="sss")]
+        ]
+        return keyboard
+    except Exception as e:
+        print(f"Error generating payment link: {e}")
+        return [[Button.inline("خطا در ایجاد لینک پرداخت", data="sss")]]
 
 def key_read_button_refferalbot(referalls, page=1, page_size=30):
 
