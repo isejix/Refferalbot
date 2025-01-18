@@ -6,32 +6,21 @@ def key_start_user():
     order = Button.text("سفارش استارت (زیر مجموعه) ⭐️", resize=True)
     detail = Button.text("اطلاعات حساب 👤", resize=True)
     inpacet =  Button.text("افزایش موجودی 👛", resize=True)
-    star =  Button.text("خدمات ویژه 💫", resize=True)
     message =  Button.text("اطلاع رسانی ها 📌", resize=True)
     rule =  Button.text("قوانین و راهنما 💡", resize=True)
     support =  Button.text("پشتیبانی ☎️", resize=True)
     
-    return [[order] ,[detail,inpacet],[star,message],[rule,support]] 
+    return [[order,detail] ,[support,inpacet],[message],[rule]] 
 
 def key_start_sudo():
     
     keyboard = [
         
-        [Button.text("اپدیت قیمت ها"), Button.text("اپلود سشن")],
+        [Button.text("اپدیت قیمت"), Button.text("اپلود سشن")],
         [Button.text("پیام همگانی"), Button.text("شارژ حساب کاربر")],
-        [Button.text("مشتریان و گزارشات"), Button.text("ادمین")]
+        [Button.text("مشتریان و گزارشات"),Button.text("ساخت کلید🔑")]
     ]
     
-    return keyboard
-
-async def key_start_admin(event):
-    buttons = [
-        
-        [Button.text("اپدیت قیمت ها"), Button.text("اپلود سشن")],
-        [Button.text("پیام همگانی"), Button.text("شارژ حساب کاربر")]
-
-    ]
-    keyboard = ReplyKeyboardMarkup(buttons, resize_keyboard=True)
     return keyboard
 
 def key_join_ejbar():
@@ -53,73 +42,29 @@ def Back_Reply():
     return keyboard
 
 
-def AllAdmins(admins):
-    keyboard = []
-    
-    for admin in admins:
-        keyboard.append([
-            Button.inline(f"{admin[1]}", b"ShowAlert"),
-            Button.inline("⚙️", f"EditAcsess_{admin[1]}"),
-            Button.inline("🗑", f"Delete_{admin[1]}")
+def key_read_button_refferalbot(referalls, page=1, page_size=30):
+
+    start_index = (page - 1) * page_size
+    end_index = start_index + page_size
+    current_page_data = referalls[start_index:end_index]
+
+    key = []
+
+    for i in current_page_data:
+        key.append([
+            Button.inline(f"🤖 اسم: {i[1]}", data=f"{i[0]}_name"),
+            Button.inline(f"💰 قیمت: {i[3]}", data=f"{i[0]}_price"),
+            Button.inline(f"🔢 شمارشگر: {i[0]}", data=f"{i[0]}_counter"),
         ])
-    keyboard.append([
-        Button.inline("افزودن ادمین", b"NewAdmin")
-    ])
-    
-    return keyboard
 
 
-def key_access_admin(userid, access, role):
-    keyboard = []
-    
-    # سطر مربوط به شناسه کاربر
-    keyboard.append([Button.inline(f"{userid}", b"ShowAlert")])
-    
-    # سطر مربوط به نقش کاربر
-    role_text = "سودو" if role == 1 else "ادمین"
-    keyboard.append([
-        Button.inline("سطح دسترسی", b"ShowAlert"),
-        Button.inline(role_text, f"AcsessTypeRole_{userid}".encode())
-    ])
+    navigation_buttons = []
+    if start_index > 0: 
+        navigation_buttons.append(Button.inline("⏪ صفحه قبل", data=f"page_{page - 1}"))
+    if end_index < len(referalls):
+        navigation_buttons.append(Button.inline("⏩ صفحه بعد", data=f"page_{page + 1}"))
 
-    # دسترسی ثبت ادمین
-    new_admin_status = "🟢" if access[1] == 1 else "🔴"
-    keyboard.append([
-        Button.inline("ثبت ادمین", b"ShowAlert"),
-        Button.inline(new_admin_status, f"NewAdminAcsess_{userid}".encode())
-    ])
-    
-    # دسترسی حذف ادمین
-    delete_admin_status = "🟢" if access[2] == 1 else "🔴"
-    keyboard.append([
-        Button.inline("حذف ادمین", b"ShowAlert"),
-        Button.inline(delete_admin_status, f"DeleteAdminAcsess_{userid}".encode())
-    ])
-    
-    # دسترسی ارسال پیام همگانی
-    send_message_status = "🟢" if access[3] == 1 else "🔴"
-    keyboard.append([
-        Button.inline("ارسال پیام همگانی", b"ShowAlert"),
-        Button.inline(send_message_status, f"SendMessageAllUsersAcsess_{userid}".encode())
-    ])
-    
-    send_message_status = "🟢" if access[4] == 1 else "🔴"
-    keyboard.append([
-        Button.inline("آپلود سشن", b"ShowAlert"),
-        Button.inline(send_message_status, f"uploadsessionAcsess_{userid}".encode())
-    ])
-    
-    send_message_status = "🟢" if access[5] == 1 else "🔴"
-    keyboard.append([
-        Button.inline("آپدیت قیمت", b"ShowAlert"),
-        Button.inline(send_message_status, f"upadtebalanceAcsess_{userid}".encode())
-    ])
-    
-    # دسترسی مسدود کردن کاربر
+    if navigation_buttons:
+        key.append(navigation_buttons) 
 
-
-    
-    # دکمه بازگشت
-    keyboard.append([Button.inline("بازگشت", b"Back")])
-    
-    return keyboard
+    return key

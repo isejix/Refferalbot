@@ -39,28 +39,11 @@ async def create_database():
         """)
 
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS wallet (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                userid BIGINT NOT NULL,
-                balance BIGINT DEFAULT 0
-            );
-        """)
-
-
-        await db.execute("""
             CREATE TABLE IF NOT EXISTS referrabots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 botname varchar,
                 username varchar,
-                referralid BIGINT NOT NULL
-            );
-        """)
-
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS price (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                referralid BIGINT NOT NULL,
-                price BIGINT NOT NULL
+                balance FLOAT NOT NULL
             );
         """)
 
@@ -260,14 +243,14 @@ async def delete_wallet(id):
         await db.commit()
 
 # ------------------------------- CRUD for 'referrabots' Table -------------------------------
-async def create_referrabot(botname, username, referralid):
+async def create_referrabot(botname:str, username:str, balance: float ):
     async with aiosqlite.connect("database.db") as db:
         await db.execute(
             """
-            INSERT INTO referrabots (botname, username, referralid)
+            INSERT INTO referrabots (botname, username, balance)
             VALUES (?, ?, ?);
             """,
-            (botname, username, referralid),
+            (str(botname), str(username), float(balance)),
         )
         await db.commit()
 
@@ -276,42 +259,17 @@ async def read_referrabots():
         async with db.execute("SELECT * FROM referrabots;") as cursor:
             return await cursor.fetchall()
 
-async def update_referrabot(id, botname=None, username=None):
-    async with aiosqlite.connect("database.db") as db:
-        if botname is not None:
-            await db.execute("UPDATE referrabots SET botname = ? WHERE id = ?;", (botname, id))
-        if username is not None:
-            await db.execute("UPDATE referrabots SET username = ? WHERE id = ?;", (username, id))
-        await db.commit()
-
-async def delete_referrabot(id):
-    async with aiosqlite.connect("database.db") as db:
-        await db.execute("DELETE FROM referrabots WHERE id = ?;", (id,))
-        await db.commit()
-
-# ------------------------------- CRUD for 'price' Table -------------------------------
-async def create_price(referralid, price):
-    async with aiosqlite.connect("database.db") as db:
-        await db.execute(
-            """
-            INSERT INTO price (referralid, price)
-            VALUES (?, ?);
+async def Updatebalancereferal(botname: str, balance : float):
+    async with aiosqlite.connect("database.db") as conn:
+        await conn.execute(
+            f"""
+                UPDATE referrabots SET balance = ? WHERE botname = ?
             """,
-            (referralid, price),
+            (float(balance),str(botname)),
         )
-        await db.commit()
-
-async def read_prices():
+        await conn.commit()
+        
+async def delete_referrabot(botname: str):
     async with aiosqlite.connect("database.db") as db:
-        async with db.execute("SELECT * FROM price;") as cursor:
-            return await cursor.fetchall()
-
-async def update_price(id, price):
-    async with aiosqlite.connect("database.db") as db:
-        await db.execute("UPDATE price SET price = ? WHERE id = ?;", (price, id))
-        await db.commit()
-
-async def delete_price(id):
-    async with aiosqlite.connect("database.db") as db:
-        await db.execute("DELETE FROM price WHERE id = ?;", (id,))
+        await db.execute("DELETE FROM referrabots WHERE botname = ?;", (str(botname,)))
         await db.commit()
