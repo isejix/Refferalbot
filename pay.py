@@ -7,7 +7,7 @@ def link_payment(amount: float):
     response = requests.post(payment, json={
         "merchant_id": merchant_id,
         "amount": int(amount), 
-        "currency": "IRR",
+        "currency": "IRT",
         "description": "خرید رفرال ربات",
         "callback_url": "https://www.google.com"
     })
@@ -34,5 +34,5 @@ def check_status_payment(amount, x):
             return "error not active"
         else:
             return response.json()["data"]["code"]
-    else:
-        raise ConnectionError(f"Failed to connect to payment gateway. Status code: {response.status_code}")
+    elif response.status_code == 401:
+        return "error not active"

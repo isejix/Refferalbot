@@ -88,9 +88,9 @@ def key_read_button_refferalbot(referalls, page=1, page_size=30):
     
     for i in current_page_data:
         key.append([
-            Button.inline(f"✅ {i[0]})", data=f"{i[0]}_counter"),
-            Button.inline(f"{i[1]}", data=f"{i[0]}_name"),
-            Button.inline(f"{i[3]}", data=f"{i[0]}_price"),
+            Button.inline(f"✅ {i[0]})", data=f"counter_{i[0]}"),
+            Button.url(f"{i[1]}", url=f"{i[2]}"),
+            Button.inline(f"{i[3]}", data=f"price_{i[0]}"),
         ])
 
     navigation_buttons = []
