@@ -58,8 +58,8 @@ async def create_database():
 
         await db.commit()
 
-
 # ------------------------------- CRUD for 'admin' Table -------------------------------
+
 async def create_admin(userid, role, accesstypeid, fname):
     async with aiosqlite.connect("database.db") as db:
         await db.execute(
@@ -110,6 +110,7 @@ async def delete_admin(id):
         await db.commit()
 
 # ------------------------------- CRUD for 'accesstype' Table -------------------------------
+
 async def create_accesstype(userid, addadmin, deleteadmin, wallet, uploadsession, updatebalance):
     async with aiosqlite.connect("database.db") as db:
         await db.execute(
@@ -154,6 +155,7 @@ async def delete_accesstype(id):
         await db.commit()
 
 # ------------------------------- CRUD for 'user' Table -------------------------------
+
 async def create_user(userid, fname, username ,walletus, referralid, score, block):
     async with aiosqlite.connect("database.db") as db:
         await db.execute(
@@ -216,6 +218,7 @@ async def delete_user(id):
         await db.commit()
 
 # ------------------------------- CRUD for 'wallet' Table -------------------------------
+
 async def create_wallet(userid, balance):
     async with aiosqlite.connect("database.db") as db:
         await db.execute(
@@ -243,6 +246,7 @@ async def delete_wallet(id):
         await db.commit()
 
 # ------------------------------- CRUD for 'referrabots' Table -------------------------------
+
 async def create_referrabot(botname:str, username:str, balance: float ):
     async with aiosqlite.connect("database.db") as db:
         await db.execute(
@@ -258,18 +262,26 @@ async def read_referrabots():
     async with aiosqlite.connect("database.db") as db:
         async with db.execute("SELECT * FROM referrabots;") as cursor:
             return await cursor.fetchall()
-
+        
+async def read_referrabot_name(botname : str):
+    async with aiosqlite.connect("database.db") as conn:
+        Cursor = await conn.execute("""
+            SELECT botname FROM referrabots
+            WHERE botname = ?
+            """, (str(botname),))
+        return await Cursor.fetchone()
+    
 async def Updatebalancereferal(botname: str, balance : float):
     async with aiosqlite.connect("database.db") as conn:
         await conn.execute(
             f"""
                 UPDATE referrabots SET balance = ? WHERE botname = ?
             """,
-            (float(balance),str(botname)),
+            (float(balance),botname),
         )
         await conn.commit()
         
 async def delete_referrabot(botname: str):
     async with aiosqlite.connect("database.db") as db:
-        await db.execute("DELETE FROM referrabots WHERE botname = ?;", (str(botname,)))
+        await db.execute("DELETE FROM referrabots WHERE botname = ?;", (botname,))
         await db.commit()

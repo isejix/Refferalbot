@@ -5,6 +5,8 @@ import ConstText
 from socks import SOCKS5, SOCKS4, HTTP
 import os
 from asyncio import sleep
+import pay
+import  re
 
 
 api_id = 2631644
@@ -98,7 +100,7 @@ async def start_bot(event):
 # -------------------------------  user -------------------------------
                         
 @client.on(events.NewMessage(pattern="افزایش موجودی 👛"))
-async def start_bot(event):
+async def update_card(event):
     userid = event.sender_id
     keyboard = keys.how_pay()
     await event.respond(ConstText.charg_acc,buttons=keyboard)
@@ -108,8 +110,6 @@ async def pay_dargah(event):
     userid = event.sender_id
     global user_cach, user_step
     user_step[userid] = "cash"
-    
-    # Ensure user_cach[userid] is a dictionary
     user_cach[userid] = {}
     
     keyboard = keys.cancel()
@@ -122,22 +122,33 @@ async def process_pay_dargah(event):
         return
 
     current_step = user_step[user_id]
-    cash = float(event.text)
+
 
     if current_step == "cash":
+        cash = float(event.text)
         if user_id not in user_cach:
             user_cach[user_id] = {}
         user_cach[user_id]["cash"] = cash
-        
-        await event.reply(
-            f"💳 فاکتور افزایش موجودی به مبلغ {user_cach[user_id]['cash']} تومان صادر گردید.\n"
-            "👈 درصورتی که مورد تاییدتان است با انتخاب یکی از گزینه های زیر پرداخت خود را انجام دهید",
-            buttons=keys.pay_dargah(user_cach[user_id]["cash"])
-        )
-
-    
+        if user_cach[user_id]["cash"] >= 1000:
+            payment_url = pay.link_payment(user_cach[user_id]["cash"])
+            match = re.search(r'/StartPay/([^/]+)', payment_url)
+            if match:
+                code = match.group(1)
+                await event.reply(
+                    f"💳 فاکتور افزایش موجودی به مبلغ {user_cach[user_id]['cash']} تومان صادر گردید.\n"
+                    "👈 درصورتی که مورد تاییدتان است با انتخاب یکی از گزینه های زیر پرداخت خود را انجام دهید",
+                    buttons=keys.pay_dargah(payment_url,code,user_cach[user_id]['cash'])
+                )
+        else:
+            await client.send_message(user_id,"مبلغ شما کمتر از میزان تعیین شده برای پرداخت است لطفا مبلغ درخواست را افزایش دهید و دوباره تلاش کنید 🌹 ")
+     
+@client.on(events.NewMessage(pattern="پرداخت مستقیم 📥"))
+async def update_card(event):
+    keyboard = keys.how_pay()
+    await event.respond(ConstText.pay_card,buttons=keyboard)    
+                  
 @client.on(events.NewMessage(pattern="قوانین و راهنما 💡"))
-async def start_bot(event):
+async def rule_bot(event):
     userid = event.sender_id
     await client.send_message(
                             userid,
@@ -145,7 +156,7 @@ async def start_bot(event):
                         )
     
 @client.on(events.NewMessage(pattern="سفارش استارت \\(زیر مجموعه\\) ⭐️"))
-async def start_bot(event):
+async def order_bot(event):
     
     referal_list = await db.read_referrabots()
     if not referal_list:
@@ -153,7 +164,7 @@ async def start_bot(event):
         return
     key = keys.key_read_button_refferalbot(referal_list, page=1)
     await event.respond("لیست ربات‌ها (صفحه ۱):", buttons=key)
-
+    
 @client.on(events.CallbackQuery(pattern=r"page_(\d+)"))
 async def pagination_handler(event):
     page = int(event.pattern_match.group(1))
@@ -165,7 +176,7 @@ async def pagination_handler(event):
     await event.edit("لیست ربات‌ها (صفحه {page}):".format(page=page), buttons=key)
 
 @client.on(events.NewMessage(pattern="اطلاع رسانی ها 📌"))
-async def start_bot(event):
+async def news_bot(event):
     userid = event.sender_id
     await client.send_message(
                             userid,
@@ -173,7 +184,7 @@ async def start_bot(event):
                         )
     
 @client.on(events.NewMessage(pattern="پشتیبانی ☎️"))
-async def start_bot(event):
+async def support_bot(event):
     userid = event.sender_id
     await client.send_message(
                             userid,
@@ -181,7 +192,7 @@ async def start_bot(event):
                         )
     
 @client.on(events.NewMessage(pattern="اطلاعات حساب 👤"))
-async def start_bot(event: events.NewMessage.Event):
+async def user_detail_bot(event: events.NewMessage.Event):
     userid = event.sender_id
     amount = await db.ReadWalletUser(userid)
     await client.send_message(
@@ -189,19 +200,60 @@ async def start_bot(event: events.NewMessage.Event):
         ConstText.detail.format(userid, amount[0])
     )
 
-@client.on(events.NewMessage(pattern="انصراف"))
+@client.on(events.NewMessage(pattern="انصراف ❌"))
 async def backmenohandeler(event):
     global user_cach,user_step
     userid = event.sender.id
     await client.send_message(userid,"🌹")
-    keyboard = keys.key_start_sudo()
-    await event.respond("تراکنش با موفقیت کنسل شد ❌", buttons=keyboard)
+    sudo = await db.ReadAdmin(userid)
+    if sudo:
+        keyboard = keys.key_start_sudo()
+        await event.respond("عملیات با موفقیت کنسل شد ❌", buttons=keyboard)
+    else:
+        keyboard = keys.key_start_user()
+        await event.respond("عملیات با موفقیت کنسل شد ❌", buttons=keyboard)
+    user_cach.pop(userid)
+    user_step.pop(userid)
+    
+@client.on(events.NewMessage(pattern="بازگشت 🔙"))
+async def backmenotexthandeler(event):
+    global user_cach,user_step
+    userid = event.sender.id
+    await client.send_message(userid,"🌹")
+    sudo = await db.ReadAdmin(userid)
+    if sudo:
+        keyboard = keys.key_start_sudo()
+        await event.respond("به منو اصلی بازگشتید 🔙", buttons=keyboard)
+    else:
+        keyboard = keys.key_start_user()
+        await event.respond("به منو اصلی بازگشتید 🔙", buttons=keyboard)
     user_cach.pop(userid)
     user_step.pop(userid)
 
+client.on(events.NewMessage(pattern="منو قبل 🔙"))
+async def backmeno(event):
+    global user_cach,user_step
+    userid = event.sender.id
+    await client.send_message(userid,"🌹")
+    sudo = await db.ReadAdmin(userid)
+    if sudo:
+        keyboard = keys.refferal_key()
+        await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
+    else:
+        keyboard = keys.key_start_user()
+        await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
+    user_cach.pop(userid)
+    user_step.pop(userid)
+  
+
 # -------------------------------  admin -------------------------------
 
-@client.on(events.NewMessage(pattern="^پیام همگانی$"))
+@client.on(events.NewMessage(pattern="کلید رفرال 📍"))
+async def update_card(event):
+    keyboard = keys.refferal_key()
+    await event.respond("یکی از موارد زیر را انتخاب کنید 🙏🏻",buttons=keyboard)
+
+@client.on(events.NewMessage(pattern="^پیام همگانی ✉️$"))
 async def send_message_channel(event: events.NewMessage.Event):
     try:
         global user_step, user_cach
@@ -212,7 +264,8 @@ async def send_message_channel(event: events.NewMessage.Event):
             AcsessType = await db.ReadAccessTypesByUserId(userid)
             if AcsessType[2] == 1:
                 user_cach[userid] = {}
-                await event.respond("لطفاً متن پیام همگانی را وارد کنید:")
+                keyboard = keys.Back_Reply()
+                await event.respond("لطفاً متن پیام همگانی را وارد کنید:",buttons=keyboard)
                 user_step[userid] = "awaiting_message_text"
             else:
                 await event.respond(ConstText.noacsess)
@@ -230,7 +283,6 @@ async def handle_send_messege(event: events.NewMessage.Event):
         step = user_step[userid]
         message_text = event.text
         if step == "awaiting_message_text" and message_text != "پیام همگانی":
-            
             user_cach[userid]["message_text"] = message_text
             users = await db.read_users()
             Msgg = await event.respond("در حال ارسال پیام به کاربران⏳")
@@ -241,20 +293,23 @@ async def handle_send_messege(event: events.NewMessage.Event):
                     print(f"خطا در ارسال پیام به کاربر {user[1]}: {user_error}")
 
             await Msgg.delete()
-            await event.respond("پیام مورد نظر با موفقیت ارسال شد✅")
+            keyboard = keys.key_start_sudo()
+            await event.respond("پیام مورد نظر با موفقیت ارسال شد✅",buttons=keyboard)
             user_step.pop(userid, None)
             user_cach.pop(userid, None)
             
-@client.on(events.NewMessage(pattern="^ساخت کلید🔑$"))
+@client.on(events.NewMessage(pattern="➕ ساخت کلید 🔑"))
 async def start_create_referrabot(event):
     user_id = event.sender_id
     global user_step,user_cach
     if user_id in user_step:
-        await event.respond("شما در حال حاضر در فرآیند ساخت ربات هستید.")
+        user_step.pop(user_id)
+        user_cach.pop(user_id)
         return
     user_step[user_id] = "name" 
     user_cach[user_id] = {}
-    await event.respond("لطفاً نام ربات را وارد کنید:")
+    keyboard = keys.Back_menu()
+    await event.respond("لطفاً نام ربات را وارد کنید:",buttons=keyboard)
 
 @client.on(events.NewMessage())
 async def process_create_bot(event):
@@ -264,15 +319,35 @@ async def process_create_bot(event):
 
     current_step = user_step[user_id]
     name = event.text
+    
+    if user_step[user_id] == "منو قبل 🔙":
+        keyboard = keys.refferal_key()
+        await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
+        return
+    
+    if current_step == "name" and name != "➕ ساخت کلید 🔑":
+ 
+            user_cach[user_id]["name"] = name
+            if user_cach[user_id]["name"]  == "منو قبل 🔙":
+                user_step.pop(user_id)
+                user_cach.pop(user_id)
+                keyboard = keys.refferal_key()
+                await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
+                return
+            user_step[user_id] = "username"
+            await event.respond("لطفاً یوزرنیم ربات را وارد کنید:")
+            
 
-    if current_step == "name" and name != "ساخت کلید🔑":
-        user_cach[user_id]["name"] = name
-        user_step[user_id] = "username"
-        await event.respond("لطفاً یوزرنیم ربات را وارد کنید:")
-        
     if current_step == "username":
+        
         username = event.text
         user_cach[user_id]["username"] = username
+        if user_cach[user_id]["username"] == "منو قبل 🔙":
+            user_step.pop(user_id)
+            user_cach.pop(user_id)
+            keyboard = keys.refferal_key()
+            await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
+            return
         user_step[user_id] = "balance"
         await event.respond("لطفاً قیمت را وارد کنید:")
         
@@ -280,15 +355,28 @@ async def process_create_bot(event):
         try:
             balance = float(event.text) 
             user_cach[user_id]["balance"] = balance  
+            if user_cach[user_id]["balance"] == "منو قبل 🔙":
+                user_step.pop(user_id)
+                user_cach.pop(user_id)
+                keyboard = keys.refferal_key()
+                await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
+                return
             user_step[user_id] = "completed" 
             await db.create_referrabot(user_cach[user_id]['name'], user_cach[user_id]['username'], user_cach[user_id]['balance'])
-            await event.respond(f"اطلاعات ربات ذخیره شد:\nنام: {user_cach[user_id]['name']}\nیوزرنیم: {user_cach[user_id]['username']}\nقیمت: {balance}")
+            keyboard = keys.refferal_key()
+            await event.respond(f"اطلاعات ربات ذخیره شد:\nنام: {user_cach[user_id]['name']}\nیوزرنیم: {user_cach[user_id]['username']}\nقیمت: {balance}",buttons=keyboard)
             user_step.pop(user_id)
             user_cach.pop(user_id)
         except ValueError:
+            if event.text == "منو قبل 🔙":
+                user_step.pop(user_id)
+                user_cach.pop(user_id)
+                keyboard = keys.refferal_key()
+                await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
+                return
             await event.respond("لطفاً قیمت را به‌صورت عدد وارد کنید.")
 
-@client.on(events.NewMessage(pattern="^شارژ حساب کاربر$"))
+@client.on(events.NewMessage(pattern="^شارژ حساب کاربر ➕$"))
 async def charge_account(event: events.NewMessage.Event):
     global user_step, user_cach
     userid = event.sender_id
@@ -339,7 +427,7 @@ async def handle_charge_account(event: events.NewMessage.Event):
             else:
                 await event.reply("لطفا یک مقدار عددی معتبر وارد کنید.")
 
-@client.on(events.NewMessage(pattern="^مشتریان و گزارشات$"))
+@client.on(events.NewMessage(pattern="^مشتریان و گزارشات 📎$"))
 async def log(event: events.NewMessage.Event):
     try:
         log = await db.read_users()
@@ -367,17 +455,20 @@ async def log(event: events.NewMessage.Event):
         print(f"Error: {e}")
         await event.respond("خطایی رخ داد. لطفاً دوباره تلاش کنید.")
 
-@client.on(events.NewMessage(pattern="^اپدیت قیمت$"))
+@client.on(events.NewMessage(pattern="^آپدیت قیمت 📌$"))
 async def update_balnce(event):
     user_id = event.sender_id
     global user_step, user_cach
     
     if user_id in user_step:
-        await event.respond("شما در حال حاضر در فرآیند ساخت ربات هستید.")
+        user_step.pop(user_id)
+        user_cach.pop(user_id)
         return
+    
     user_step[user_id] = "namee" 
     user_cach[user_id] = {}
-    await event.respond("لطفاً نام ربات را وارد کنید:")
+    keyboard = keys.Back_menu()
+    await event.respond("لطفاً نام ربات را وارد کنید:",buttons=keyboard)
     
 @client.on(events.NewMessage())
 async def process_update_balance(event):
@@ -386,22 +477,154 @@ async def process_update_balance(event):
         return
 
     current_step = user_step[user_id]
-    name = event.text
+    namee = event.text
 
-    if current_step == "namee" and name != "اپدیت قیمت":
-        user_cach[user_id]["namee"] = name
+    if current_step == "namee" and namee != "آپدیت قیمت 📌":
+        user_cach[user_id]["namee"] = namee
+        if user_cach[user_id]["namee"]  == "منو قبل 🔙":
+                user_step.pop(user_id)
+                user_cach.pop(user_id)
+                keyboard = keys.refferal_key()
+                await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
+                return
         user_step[user_id] = "balancee"
-        await event.respond("لطفاً قیمت جدید را وارد کنید:")
-        
-    if current_step == "balancee":
-        balancee = float(event.text) 
-        user_cach[user_id]["balancee"] = balancee
+        is_valid = await db.read_referrabot_name(user_cach[user_id]["namee"])
+        if is_valid:
+            await event.respond("لطفاً قیمت جدید را وارد کنید:")
+        else:
+            await event.respond("نام اشتباه وارد شده است")
+            
+    
+    try: 
+        if current_step == "balancee":
+            balancee = float(event.text) 
+            user_cach[user_id]["balancee"] = balancee
+            if user_cach[user_id]["namee"]  == "منو قبل 🔙":
+                    user_step.pop(user_id)
+                    user_cach.pop(user_id)
+                    keyboard = keys.refferal_key()
+                    await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
+                    return
         balancee = user_cach[user_id]["balancee"]
         await db.Updatebalancereferal(user_cach[user_id]["namee"],user_cach[user_id]["balancee"])
-        await event.respond(f"اطلاعات ربات ذخیره شد:\nنام: {user_cach[user_id]["namee"]}\nقیمت جدید: {balancee}")
+        keyboard = keys.refferal_key()
+        await event.respond(f"اطلاعات جدید ذخیره شد 👇🏻\nنام: {user_cach[user_id]["namee"]}\nقیمت جدید: {balancee}",buttons=keyboard)
         user_step.pop(user_id)
         user_cach.pop(user_id)
+    except ValueError:
+            if event.text == "منو قبل 🔙":
+                user_step.pop(user_id)
+                user_cach.pop(user_id)
+                keyboard = keys.refferal_key()
+                await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
+                return
+            await event.respond("لطفاً قیمت را به‌صورت عدد وارد کنید.")
+            user_step.pop(user_id)
+            user_cach.pop(user_id)
+
+@client.on(events.NewMessage(pattern="➖ حذف کلید 🔑"))
+async def delete_refferal_bot(event):
+    user_id = event.sender_id
+    global user_step, user_cach
+    
+    if user_id in user_step:
+        user_step.pop(user_id)
+        user_cach.pop(user_id)
+        return
+    
+    user_step[user_id] = "nam" 
+    user_cach[user_id] = {}
+    keyboard = keys.Back_menu()
+    await event.respond("لطفاً نام ربات را وارد کنید:",buttons=keyboard)
+    
+@client.on(events.NewMessage())
+async def delete_refferal_bot(event):
+    user_id = event.sender_id
+    if user_id not in user_step:
+        return
+
+    current_step = user_step[user_id]
+    nam = event.text
+
+    if current_step == "nam" and nam != "➖ حذف کلید 🔑":
+        user_cach[user_id]["nam"] = nam
+        is_valid = await db.read_referrabot_name(user_cach[user_id]["nam"])
+        if is_valid:
+            if user_cach[user_id]["nam"]  == "منو قبل 🔙":
+                    user_step.pop(user_id)
+                    user_cach.pop(user_id)
+                    keyboard = keys.refferal_key()
+                    await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
+                    return
+            await db.delete_referrabot(str(user_cach[user_id]["nam"]))
+            keyboard = keys.refferal_key()
+            await event.respond("کلید با موفقیت حذف شد ✅",buttons=keyboard)
+            user_step.pop(user_id)
+            user_cach.pop(user_id)
+        
+        else:
+            await event.respond("نام اشتباه وارد شده است")
+        
+@client.on(events.NewMessage(pattern="♾️ نمایش کلید ها 🔑"))
+async def show_ref_bot(event):
+    user_id = event.sender_id
+    admin = await db.ReadAdmin(user_id)
+    if admin:
+        referal_list = await db.read_referrabots()
+        if not referal_list:
+            await event.respond("هیچ رباتی در لیست وجود ندارد.")
+            return
+        key = keys.key_read_button_refferalbot(referal_list, page=1)
+        await event.respond("لیست ربات‌ها (صفحه ۱):", buttons=key)
+    else:
+        key = keys.key_start_sudo()
+        await event.respond("شما به این بخش دسترسی ندارید ⚠️", buttons=key)
+    
+@client.on(events.CallbackQuery(pattern=r"page_(\d+)"))
+async def show_ref_bot_handler(event):
+    page = int(event.pattern_match.group(1))
+    referal_list = await db.read_referrabots()
+    if not referal_list:
+        await event.answer("هیچ داده‌ای برای نمایش وجود ندارد.", alert=True)
+        return
+    key = keys.key_read_button_refferalbot(referal_list, page=page)
+    await event.edit("لیست ربات‌ها (صفحه {page}):".format(page=page), buttons=key)
+    
+# -------------------------------  callback -------------------------------
             
+            
+user_cach = {}
+@client.on(events.CallbackQuery)
+async def callback_handler(event):
+    userid = event.sender.id
+    global user_step, user_cach
+    data = event.data.decode()
+    
+    if "at_" in data:
+        separated = data.split(',')
+        at=separated[0].replace("at_","")
+        amount = separated[1].replace("am_","")
+        if at and amount: 
+            response = pay.check_status_payment(amount,at)
+            if "error not active" in response:
+                await event.respond("هنوز پرداخت انجام نشده است ") 
+    
+            elif response == 100 or response == 101:
+                f = await db.ReadWalletUser(userid)
+                await db.UpdateWalletUser(int(userid), int(amount)+ f[0])
+                buttons = keys.key_start_user()
+                await event.edit("پرداخت با موفقیت انجام شد", buttons=buttons)
+                
+            else:
+                buttons=keys.key_start_user()
+                await event.edit("پرداخت انجام نشد ",buttons=buttons)
+
+    if "back" in data:
+        keyboard=keys.Back_Reply()
+        await event.edit("به منو اصلی بازگشتید 🔙", buttons=keyboard)
+      
+# -------------------------------  run bot -------------------------------
+      
 async def run():
     await db.create_database()
     
@@ -421,7 +644,5 @@ async def run():
 
     print("Run")
     await client.run_until_disconnected()
-
-
 
 client.loop.run_until_complete(run())

@@ -7,7 +7,7 @@ def link_payment(amount: float):
     response = requests.post(payment, json={
         "merchant_id": merchant_id,
         "amount": int(amount), 
-        "currency": "IRT",
+        "currency": "IRR",
         "description": "خرید رفرال ربات",
         "callback_url": "https://www.google.com"
     })
@@ -23,22 +23,16 @@ def link_payment(amount: float):
 
 
 
-def check_status_payment(amount:float,x):
-    
-    xx = requests.post("https://payment.zarinpal.com/pg/v4/payment/verify.json",{
-        "merchant_id" : merchant_id,
-        "amount" : amount,
-        "authority" : x
-    }) 
-
-    return xx.json()["data"]["code"]
-
-# y =link_payment(2000)
-
-# link ="https://payment.zarinpal.com/pg/StartPay/" + y.json()["data"]["authority"]
-
-# input(link)
-
-# x=check_status_payment(2000, y.json()["data"]["authority"])
-
-# pass
+def check_status_payment(amount, x):
+    response = requests.post("https://payment.zarinpal.com/pg/v4/payment/verify.json", {
+        "merchant_id": merchant_id,
+        "amount": int(float(amount)),
+        "authority": x
+    })
+    if response.status_code == 200:
+        if 'errors' in response and response['errors']['message'] == 'Session is not valid, session is not active paid try.':
+            return "error not active"
+        else:
+            return response.json()["data"]["code"]
+    else:
+        raise ConnectionError(f"Failed to connect to payment gateway. Status code: {response.status_code}")
