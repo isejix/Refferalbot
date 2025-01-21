@@ -9,7 +9,7 @@ def link_payment(amount: float):
         "amount": int(amount), 
         "currency": "IRT",
         "description": "خرید رفرال ربات",
-        "callback_url": "https://www.google.com"
+        "callback_url": "https://ifaridreza.ir/"
     })
 
     if response.status_code == 200:

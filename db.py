@@ -51,8 +51,7 @@ async def create_database():
             CREATE TABLE IF NOT EXISTS accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 sessions BIGINT NOT NULL,
-                status BIT DEFAULT 0,
-                referralid BIGINT NOT NULL
+                date DATETIME
             );
         """)
 
@@ -285,3 +284,19 @@ async def delete_referrabot(botname: str):
     async with aiosqlite.connect("database.db") as db:
         await db.execute("DELETE FROM referrabots WHERE botname = ?;", (botname,))
         await db.commit()
+
+# ------------------------------- CRUD for 'accounts' Table -------------------------------
+
+async def create_account(phone: int, date):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("""
+            INSERT INTO accounts (sessions, date)
+            VALUES (?, ?);
+        """, (int(phone),date))
+        await db.commit()
+
+async def read_account(date):
+    async with aiosqlite.connect("database.db") as db:
+        async with db.execute("SELECT * FROM accounts WHERE date = ?", (date,)) as cursor:
+            account = await cursor.fetchone()
+            return account

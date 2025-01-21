@@ -8,8 +8,10 @@ def key_start_user():
     message =  Button.text("اطلاع رسانی ها 📌", resize=True)
     rule =  Button.text("قوانین و راهنما 💡", resize=True)
     support =  Button.text("پشتیبانی ☎️", resize=True)
+    superq =  Button.text("خدمات ویژه! 💫", resize=True)
     
-    return [[order,detail] ,[support,inpacet],[message],[rule]] 
+    
+    return [[order],[detail,inpacet],[message,superq],[rule,support]] 
 
 def key_start_sudo():
     
@@ -63,8 +65,8 @@ def how_pay():
 def pay_dargah(payment_url,code,amount):
     try:
         keyboard = [
-            [Button.url("درگاه پرداخت 🛍", url=payment_url),
-            Button.inline("تایید پرداخت ✅", data=f"at_{code},am_{amount}")
+            [Button.url("درگاه پرداخت 🛍", url=payment_url)],
+            [Button.inline("بررسی✅", data=f"at_{code},am_{amount}")
             ]
         ]
         return keyboard
@@ -105,3 +107,17 @@ def key_read_button_refferalbot(referalls, page=1, page_size=30):
     key.append([Button.inline("بازگشت 🔙", data="back")])
 
     return key
+
+def key_channel():
+    keyboard = [
+        
+        [Button.url("کانال گزارش خرید 📊", url='https://t.me/refferall_bo')]
+    ]
+    return keyboard
+
+def key_id_suppoort():
+    keyboard = [
+        
+        [Button.url("ارتباط با پشتیبانی 🆔", url='https://t.me/sajjad_emp')]
+    ]
+    return keyboard
