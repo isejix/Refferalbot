@@ -17,7 +17,7 @@ def key_start_sudo():
     
     keyboard = [
         
-        [Button.text("کلید رفرال 📍",resize=True), Button.text("آپلود سشن 📤",resize=True)],
+        [Button.text("مدیریت ربات ها📍",resize=True), Button.text("آپلود سشن 📤",resize=True)],
         [Button.text("پیام همگانی ✉️",resize=True), Button.text("حساب کاربر 👤",resize=True)],
         [Button.text("مشتریان و گزارشات 📎",resize=True)]
     ]
@@ -160,3 +160,9 @@ def key_order_ref(balance,namee,count=1):
     ]
     return keyboard
     
+def key_chanell_notif():
+    keyboard = [
+        
+        [Button.url("کانال گزارشات 🆔", url='https://t.me/refferall_bo')]
+    ]
+    return keyboard    

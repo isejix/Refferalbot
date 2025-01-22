@@ -221,15 +221,17 @@ async def blockN_User(UserId: int, block : int):
         )
         await conn.commit()
                
-async def delete_user(id):
+async def delete_user(id : int):
     async with aiosqlite.connect("database.db") as db:
-        await db.execute("DELETE * FROM user WHERE id = ?;", (id,))
+        await db.execute("DELETE FROM user WHERE userid = ?;", (id,))
         await db.commit()
         
 async def delete_wallet_user(id):
     async with aiosqlite.connect("database.db") as db:
-        await db.execute("DELETE walletus FROM user WHERE id = ?;", (id,))
+        await db.execute("UPDATE user SET walletus = ? WHERE userid = ?;", (0, id))
         await db.commit()
+
+
 
 # ------------------------------- CRUD for 'wallet' Table -------------------------------
 
