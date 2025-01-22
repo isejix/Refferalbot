@@ -54,6 +54,18 @@ async def create_database():
                 date DATETIME
             );
         """)
+        
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS discount (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code BIGINT ,
+                dateexpire DATETIME,
+                countallow INT,
+                countuse INT,
+                percentdis FLOAT
+                
+            );
+        """)
 
         await db.commit()
 
@@ -198,22 +210,25 @@ async def UpdateWalletUser(UserId: int, walletus : int):
             (walletus,str(UserId)),
         )
         await conn.commit()
-        
-async def update_user(id, walletus=None, referralid=None, score=None, block=None):
-    async with aiosqlite.connect("database.db") as db:
-        if walletus is not None:
-            await db.execute("UPDATE user SET walletus = ? WHERE id = ?;", (walletus, id))
-        if referralid is not None:
-            await db.execute("UPDATE user SET referralid = ? WHERE id = ?;", (referralid, id))
-        if score is not None:
-            await db.execute("UPDATE user SET score = ? WHERE id = ?;", (score, id))
-        if block is not None:
-            await db.execute("UPDATE user SET block = ? WHERE id = ?;", (block, id))
-        await db.commit()
 
+async def blockN_User(UserId: int, block : int):
+    async with aiosqlite.connect("database.db") as conn:
+        await conn.execute(
+            f"""
+                UPDATE user SET block = ? WHERE UserId = ?
+            """,
+            (block,str(UserId)),
+        )
+        await conn.commit()
+               
 async def delete_user(id):
     async with aiosqlite.connect("database.db") as db:
-        await db.execute("DELETE FROM user WHERE id = ?;", (id,))
+        await db.execute("DELETE * FROM user WHERE id = ?;", (id,))
+        await db.commit()
+        
+async def delete_wallet_user(id):
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("DELETE walletus FROM user WHERE id = ?;", (id,))
         await db.commit()
 
 # ------------------------------- CRUD for 'wallet' Table -------------------------------
@@ -261,11 +276,27 @@ async def read_referrabots():
     async with aiosqlite.connect("database.db") as db:
         async with db.execute("SELECT * FROM referrabots;") as cursor:
             return await cursor.fetchall()
-        
+
 async def read_referrabot_name(botname : str):
     async with aiosqlite.connect("database.db") as conn:
         Cursor = await conn.execute("""
             SELECT botname FROM referrabots
+            WHERE botname = ?
+            """, (str(botname),))
+        return await Cursor.fetchone()
+
+async def read_referrabotbyname(botname : str):
+    async with aiosqlite.connect("database.db") as conn:
+        Cursor = await conn.execute("""
+            SELECT botname , username , balance FROM referrabots
+            WHERE botname = ?
+            """, (str(botname),))
+        return await Cursor.fetchone()
+
+async def read_balance_referrabotbyname(botname : str):
+    async with aiosqlite.connect("database.db") as conn:
+        Cursor = await conn.execute("""
+            SELECT balance FROM referrabots
             WHERE botname = ?
             """, (str(botname),))
         return await Cursor.fetchone()
@@ -298,5 +329,52 @@ async def create_account(phone: int, date):
 async def read_account(date):
     async with aiosqlite.connect("database.db") as db:
         async with db.execute("SELECT * FROM accounts WHERE date = ?", (date,)) as cursor:
-            account = await cursor.fetchone()
-            return account
+            await cursor.fetchone()
+            
+# ------------------------------- CRUD for 'dicount' Table -------------------------------
+
+async def create_discount(code, dateexpire, countallow, percentdis):
+    """ایجاد کد تخفیف جدید."""
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute(
+            """
+            INSERT INTO discount (code, dateexpire, countallow, countuse, percentdis)
+            VALUES (?, ?, ?, 0, ?);
+            """,
+            (code, dateexpire, countallow, percentdis),
+        )
+        await db.commit()
+
+async def read_discounts():
+    """دریافت تمامی کدهای تخفیف."""
+    async with aiosqlite.connect("database.db") as db:
+        async with db.execute("SELECT * FROM discount;") as cursor:
+            return await cursor.fetchall()
+
+async def get_discount(code):
+    """دریافت اطلاعات کد تخفیف بر اساس `code`."""
+    async with aiosqlite.connect("database.db") as db:
+        async with db.execute("SELECT * FROM discount WHERE code = ?;", (code,)) as cursor:
+            return await cursor.fetchone()
+
+async def update_discount(code, dateexpire=None, countallow=None, percentdis=None):
+    async with aiosqlite.connect("database.db") as db:
+        if dateexpire:
+            await db.execute("UPDATE discount SET dateexpire = ? WHERE code = ?;", (dateexpire, code))
+        if countallow:
+            await db.execute("UPDATE discount SET countallow = ? WHERE code = ?;", (countallow, code))
+        if percentdis:
+            await db.execute("UPDATE discount SET percentdis = ? WHERE code = ?;", (percentdis, code))
+        await db.commit()
+
+async def delete_discount(code):
+    """حذف کد تخفیف بر اساس `code`."""
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("DELETE FROM discount WHERE code = ?;", (code,))
+        await db.commit()
+
+async def delete_expired_discounts(datee):
+    """حذف کدهای تخفیف منقضی‌شده."""
+    async with aiosqlite.connect("database.db") as db:
+        await db.execute("DELETE FROM discount WHERE dateexpire < ?;", (datee,))
+        await db.commit()

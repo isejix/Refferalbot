@@ -18,8 +18,20 @@ def key_start_sudo():
     keyboard = [
         
         [Button.text("کلید رفرال 📍",resize=True), Button.text("آپلود سشن 📤",resize=True)],
-        [Button.text("پیام همگانی ✉️",resize=True), Button.text("شارژ حساب کاربر ➕",resize=True)],
+        [Button.text("پیام همگانی ✉️",resize=True), Button.text("حساب کاربر 👤",resize=True)],
         [Button.text("مشتریان و گزارشات 📎",resize=True)]
+    ]
+    
+    return keyboard
+
+def key_charg_user():
+    
+    keyboard = [
+        
+        [Button.text("کسر حساب ➖",resize=True), Button.text("شارژ حساب ➕",resize=True)],
+        [Button.text("حذف حساب شارژ 🗑",resize=True),Button.text("حذف حساب کاربر 🗑",resize=True)],
+        [Button.text("مسدود کردن 🔴",resize=True),Button.text("رفع مسدودیت 🟢",resize=True)]
+        
     ]
     
     return keyboard
@@ -121,3 +133,30 @@ def key_id_suppoort():
         [Button.url("ارتباط با پشتیبانی 🆔", url='https://t.me/sajjad_emp')]
     ]
     return keyboard
+
+def key_order_ref(balance,namee,count=1):
+    keyboard = [[
+        
+            Button.inline("➕", data=f"plus_{count}"),
+            Button.inline(f"تعداد: {count}", data="count"),
+            Button.inline("➖", data=f"neg_{count}")
+                ],
+                [
+            Button.inline("1", data="do_1"),
+            Button.inline("5", data="do_5"),
+            Button.inline("10", data="do_10"),
+            Button.inline("15", data="do_15"),
+            Button.inline("20", data="do_20"),
+            Button.inline("50", data="do_50"),
+            Button.inline("100", data="do_100")
+                ],
+                [
+            Button.inline(f"💴 قیمت کل: {balance} تومان", data=f"balance_{namee}")
+                ],
+                [
+            Button.inline("ثبت سفارش ✅", data="accept_order"),
+                    
+                ]
+    ]
+    return keyboard
+    

@@ -13,6 +13,7 @@ import account
 from datetime import date
 from telethon.tl.types import SendMessageTypingAction
 import asyncio
+import sqlite3
 
 api_id = 2631644
 api_hash = '2a0dec0b80b84e501c5d9806248eb235'
@@ -149,6 +150,9 @@ async def process(event):
                         "👈 درصورتی که مورد تاییدتان است با انتخاب یکی از گزینه های زیر پرداخت خود را انجام دهید",
                         buttons=keys.pay_dargah(payment_url,code,user_cach[user_id]['cash'])
                     )
+                        await event.respond("🛍 فاکتور شما با موفقیت ایجاد شد.",buttons=keys.cancel())
+                        user_step.pop(user_id)
+                        user_cach.pop(user_id)
                     
             else:
                 async with client.action(event.chat_id, 'typing'):
@@ -307,31 +311,31 @@ async def process(event):
                     await asyncio.sleep(0.3)
                     await event.respond("مقدار ورودی شما اشتباه میباشد لطفا عدد وارد کنید 🙏🏻")
             
-        if current_step == "user_id":
-            user_id = event.text
-            if user_id.isdigit():
-                user_cach[user_id]["user_id"] = user_id
-                async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.reply("چقدر می‌خواهید حساب کاربر را شارژ کنید؟")
-                user_step[user_id] = "charge_amount"
-
-        elif current_step == "charge_amount":
-            charge_amount = event.text
-            if charge_amount.isdigit():
-                user_cach[user_id]["charge_amount"] = int(charge_amount)
-                user_id = user_cach[user_id]["user_id"]
-                f = await db.ReadWalletUser(user_id)
-                await db.UpdateWalletUser(int(user_id), int(charge_amount)+ f[0])
-                keyboard = keys.key_start_sudo()
-                async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.reply(f"مقدار {charge_amount} حساب کاربر {user_id} شارژ شد.",buttons=keyboard)
-                    await client.send_message(int(user_id), f"مقدار {charge_amount} حساب شما شارژ شد.")
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
-            else:
-                await event.reply("لطفا یک مقدار عددی معتبر وارد کنید.")
+    if current_step == "user_id":
+        user_id = event.text
+        if user_id.isdigit():
+            user_cach[user_id]["user_id"] = user_id
+            async with client.action(event.chat_id, 'typing'):
+                await asyncio.sleep(0.3)
+                await event.reply("چقدر می‌خواهید حساب کاربر را شارژ کنید؟")
+            user_step[user_id] = "charge_amount"
+            
+    elif current_step == "charge_amount":
+        charge_amount = event.text
+        if charge_amount.isdigit():
+            user_cach[user_id]["charge_amount"] = int(charge_amount)
+            user_id = user_cach[user_id]["user_id"]
+            f = await db.ReadWalletUser(user_id)
+            await db.UpdateWalletUser(int(user_id), int(charge_amount)+ f[0])
+            keyboard = keys.key_start_sudo()
+            async with client.action(event.chat_id, 'typing'):
+                await asyncio.sleep(0.3)
+                await event.reply(f"مقدار {charge_amount} حساب کاربر {user_id} شارژ شد.",buttons=keyboard)
+                await client.send_message(int(user_id), f"مقدار {charge_amount} حساب شما شارژ شد.")
+            user_step.pop(user_id)
+            user_cach.pop(user_id)
+        else:
+            await event.reply("لطفا یک مقدار عددی معتبر وارد کنید.")
                 
     file_name = event.document.mime_type
             
@@ -344,109 +348,237 @@ async def process(event):
                 with zipfile.ZipFile(path, 'r') as zip_ref:
                     zip_files = zip_ref.namelist()
                     session_files = [file for file in zip_files if file.endswith('.session')]
-                    if session_files:
-                        i = 0
-                        for file in session_files:
-                            check_stat = account.check_status_sessions(file)
-                            if check_stat:
-                                today = date.today()
-                                to_day = today.strftime("%Y/%m/%d") 
-                                x = file.split('/')[-1]
-                                phone_number = x.replace(".session", "")
-                                await db.create_account(int(phone_number),to_day)
-                                zip_ref.extract(file, folder_path)
-                                src_file = os.path.join(folder_path, file)
-                                dest_folder = "./session"
-                                os.makedirs(folder_path, exist_ok=True)
-                                await move_file(src_file, dest_folder)
-                                i = i + 1
-                                if len(session_files) == i:
-                                    async with client.action(event.chat_id, 'typing'):
-                                        await asyncio.sleep(0.3)
-                                        await event.respond(f"تعداد {i} سشن سالم در تاریخ امروز {to_day}به اکانت ها اضاف شد ⭐️")
-                                    user_cach.pop(user_id)
-                                    user_step.pop(user_id)
-                            else:
-                                os.remove(file)
+
+                    if not session_files:
+                        await event.respond("هیچ فایل سشن (.session) درون فایل zip یافت نشد.")
+                        return
+
+                    i = 0
+                    dest_folder = "./session"
+                    os.makedirs(dest_folder, exist_ok=True)
+
+                    for file in session_files:
+                        zip_ref.extract(file, folder_path)
+                        src_file = os.path.join(folder_path, file)
+
+                        try:
+                            await move_file(src_file, dest_folder)
+                            i += 1
+                        except Exception as e:
+                            print(f"Error moving file {src_file}: {e}")
+                            continue
+
+                    if i > 0:
+                        folder_path = "./session"
+                        if os.path.exists(folder_path):
+                            files = os.listdir(folder_path)
+                            if files:
+                                healthy_count = 0 
+                                broken_count = 0  
+
+                                for file in files:
+                                    file_path = os.path.join(folder_path, file) 
+                                    check_stat = await account.check_status_sessions(file_path) 
+
+                                    if check_stat: 
+                                        healthy_count += 1
+                                        today = date.today()
+                                        to_day = today.strftime("%Y/%m/%d")
+                                        phone_number = file.replace(".session", "") 
+
+                                        try:
+                                            await db.create_account(int(phone_number), to_day)
+                                        except sqlite3.OperationalError as e:
+                                            print(f"Database error: {e}")
+                                            async with client.action(event.chat_id, 'typing'):
+                                                await asyncio.sleep(0.3)
+                                                await event.respond("خطایی در دیتابیس رخ داده است.")
+                                            continue
+                                    else:  
+                                        broken_count += 1
+                                        # os.remove(file_path)  
+
                                 async with client.action(event.chat_id, 'typing'):
                                     await asyncio.sleep(0.3)
-                                await event.respond(f"فایل سشن {file} خراب است وبه طور خودکار از دیتابیس حذف شد")      
+                                    await event.respond(
+                                        f"تعداد {healthy_count} سشن سالم به اکانت‌ها اضافه شد ⭐️\n"
+                                        f"تعداد {broken_count} سشن خراب است."
+                                    )
+                            else:
+                
+                                async with client.action(event.chat_id, 'typing'):
+                                    await asyncio.sleep(0.3)
+                                    await event.respond("پوشه سشن خالی است.")
                     else:
+         
                         async with client.action(event.chat_id, 'typing'):
                             await asyncio.sleep(0.3)
-                            await event.respond("هیچ فایل سشن (.session) درون فایل zip یافت نشد.")
-                os.remove(path)
+                            await event.respond(f"مسیر '{folder_path}' وجود ندارد.")
+
+            except zipfile.BadZipFile:
+                await event.respond("فایل zip خراب است. لطفاً یک فایل معتبر آپلود کنید.")
+            finally:
+         
+                if os.path.exists(path):
+                    os.remove(path)
                 if os.path.exists(folder_path):
                     shutil.rmtree(folder_path)
-                    user_cach.pop(user_id)
-                    user_step.pop(user_id)        
-            except zipfile.BadZipFile:
-                async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.respond("فایل zip خراب است یا فرمت اشتباه دارد.")
         else:
+                    async with client.action(event.chat_id, 'typing'):
+                            await asyncio.sleep(0.3)
+                            await event.respond("فرمت فایل اشتباه است. لطفاً یک فایل zip ارسال نمایید.")
+
+    if current_step == "user_id_neg":
+        user_id = event.text
+        if user_id.isdigit():
+            user_cach[user_id]["user_id"] = user_id
             async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.respond("فرمت فایل اشتباه است. لطفاً یک فایل zip ارسال نمایید.")
-                            
+                await asyncio.sleep(0.3)
+                await event.reply("چقدر می‌خواهیداز حساب کاربر را کسر کنید؟")
+            user_step[user_id] = "charge_amount"
+            
+    elif current_step == "charge_amount":
+        charge_amount = event.text
+        if charge_amount.isdigit():
+            user_cach[user_id]["charge_amount"] = int(charge_amount)
+            user_id = user_cach[user_id]["user_id"]
+            f = await db.ReadWalletUser(user_id)
+            await db.UpdateWalletUser(int(user_id), int(charge_amount)+ f[0])
+            keyboard = keys.key_start_sudo()
+            async with client.action(event.chat_id, 'typing'):
+                await asyncio.sleep(0.3)
+                await event.reply(f"مقدار {charge_amount} حساب کاربر {user_id} کسر شد.",buttons=keyboard)
+                await client.send_message(int(user_id), f"مقدار {charge_amount} حساب شما کسر شد.")
+            user_step.pop(user_id)
+            user_cach.pop(user_id)
+        else:
+            await event.reply("لطفا یک مقدار عددی معتبر وارد کنید.")
+    
+    if current_step == "user_id_delete":
+        user_id = event.text
+        if user_id.isdigit():
+            user_cach[user_id]["user_id"] = user
+            await db.delete_user(user)
+            keyboard = keys.key_start_sudo()
+            async with client.action(event.chat_id, 'typing'):
+                await asyncio.sleep(0.3)
+                await event.respond("حساب کاربر با موفقیت حذف شد✅",buttons=keyboard)
+            
+    if current_step == "block_user_id":
+        user_id = event.text
+        if user_id.isdigit():
+            user_cach[user_id]["user_id"] = user
+            await db.blockN_User(user,1)
+            keyboard = keys.key_start_sudo()
+            async with client.action(event.chat_id, 'typing'):
+                await asyncio.sleep(0.3)
+                await event.respond("حساب کاربر با موفقیت مسدود شد 🔴",buttons=keyboard)
+    
+    if current_step == "unblock_user_id":
+        user_id = event.text
+        if user_id.isdigit():
+            user_cach[user_id]["user_id"] = user
+            await db.blockN_User(user,0)
+            keyboard = keys.key_start_sudo()
+            async with client.action(event.chat_id, 'typing'):
+                await asyncio.sleep(0.3)
+                await event.respond("حساب کاربر با موفقیت رفع مسدودیت شد 🟢",buttons=keyboard)
+                
+    step = user_step[user_id]
+    message_text = event.text
+    
+    if step == "awaiting_message_text" and message_text != "پیام همگانی ✉️":
+        user_cach[user_id]["message_text"] = message_text
+        users = await db.read_users()
+        async with client.action(event.chat_id, 'typing'):
+                await asyncio.sleep(0.3)
+        Msgg = await event.respond("در حال ارسال پیام به کاربران⏳")
+        for user in users:
+            try:
+                await client.send_message(int(user[1]), message_text)
+            except Exception as user_error:
+                print(f"خطا در ارسال پیام به کاربر {user[1]}: {user_error}")
+        await Msgg.delete()
+        keyboard = keys.key_start_sudo()
+        async with client.action(event.chat_id, 'typing'):
+                await asyncio.sleep(0.3)
+                await event.respond("پیام مورد نظر با موفقیت ارسال شد✅",buttons=keyboard)
+        user_step.pop(user_id, None)
+        user_cach.pop(user_id, None)                     
+            
 # -------------------------------  user -------------------------------
                         
 @client.on(events.NewMessage(pattern="افزایش موجودی 👛"))
 async def update_card(event):
-    keyboard = keys.how_pay()
-    async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.reply(ConstText.charg_acc,buttons=keyboard)
+    user_id = event.sender_id
+    b = await db.ReadUserByUserId(user_id)
+    if b[7] == 0:
+        keyboard = keys.how_pay()
+        async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.reply(ConstText.charg_acc,buttons=keyboard)
 
 @client.on(events.NewMessage(pattern="خدمات ویژه! 💫"))
 async def update_card(event):
-    async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.reply("❕ این بخش در بزودی فعال خواهد شد ...")
+    user_id = event.sender_id
+    b = await db.ReadUserByUserId(user_id)
+    if b[7] == 0:
+        async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.reply("❕ این بخش در بزودی فعال خواهد شد ...")
 
 @client.on(events.NewMessage(pattern="💵 درگاه بانکی"))
 async def pay_dargah(event):
     user_id = event.sender_id
-    global user_cach, user_step
-    user_step[user_id] = "cash"
-    user_cach[user_id] = {}
-    
-    keyboard = keys.cancel()
-    async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.respond("💶 جهت افزایش موجودی حساب مبلغ مورد نظرخود را به تومان وارد نمایید:", buttons=keyboard)
+    b = await db.ReadUserByUserId(user_id)
+    if b[7] == 0:
+        global user_cach, user_step
+        user_step[user_id] = "cash"
+        user_cach[user_id] = {}
+        
+        keyboard = keys.cancel()
+        async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.respond("💶 جهت افزایش موجودی حساب مبلغ مورد نظرخود را به تومان وارد نمایید:", buttons=keyboard)
 
 @client.on(events.NewMessage(pattern="پرداخت مستقیم 📥"))
 async def update_card(event):
-    keyboard = keys.how_pay()
-    async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.respond(ConstText.pay_card,buttons=keyboard)    
+    user_id = event.sender_id
+    b = await db.ReadUserByUserId(user_id)
+    if b[7] == 0:
+        keyboard = keys.how_pay()
+        async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.respond(ConstText.pay_card,buttons=keyboard)    
                   
 @client.on(events.NewMessage(pattern="قوانین و راهنما 💡"))
 async def rule_bot(event):
     user_id = event.sender_id
-    async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await client.send_message(
-                            user_id,
-                            ConstText.rules,
-                            parse_mode="HTML"
-                        )
+    b = await db.ReadUserByUserId(user_id)
+    if b[7] == 0:
+        async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await client.send_message(
+                                user_id,
+                                ConstText.rules,
+                                parse_mode="HTML"
+                            )
   
 @client.on(events.NewMessage(pattern="سفارش استارت \\(زیر مجموعه\\) ⭐️"))
 async def order_bot(event):
-    
-    referal_list = await db.read_referrabots()
-    if not referal_list:
+    user_id = event.sender_id
+    b = await db.ReadUserByUserId(user_id)
+    if b[7] == 0:
+        referal_list = await db.read_referrabots()
+        if not referal_list:
+            async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.respond("هیچ رباتی در لیست وجود ندارد.")
+            return
         async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.respond("هیچ رباتی در لیست وجود ندارد.")
-        return
-    async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    key = keys.key_read_button_refferalbot(referal_list, page=1)
-                    await event.respond("لیست ربات‌ها (صفحه ۱) 👇🏻", buttons=key)
+                        await asyncio.sleep(0.3)
+                        key = keys.key_read_button_refferalbot(referal_list, page=1)
+                        await event.respond("لیست ربات‌ها (صفحه ۱) 👇🏻", buttons=key)
     
 @client.on(events.CallbackQuery(pattern=r"page_(\d+)"))
 async def pagination_handler(event):
@@ -464,10 +596,13 @@ async def pagination_handler(event):
 
 @client.on(events.NewMessage(pattern="اطلاع رسانی ها 📌"))
 async def news_bot(event):
-    keyboard = keys.Back_menu()
-    async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.reply(ConstText.channel,buttons=keyboard)
+    user_id = event.sender_id
+    b = await db.ReadUserByUserId(user_id)
+    if b[7] == 0:    
+        keyboard = keys.Back_menu()
+        async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.reply(ConstText.channel,buttons=keyboard)
     
 @client.on(events.NewMessage(pattern="پشتیبانی ☎️"))
 async def support_bot(event):
@@ -483,7 +618,7 @@ async def support_bot(event):
     
 @client.on(events.NewMessage(pattern="اطلاعات حساب 👤"))
 async def user_detail_bot(event: events.NewMessage.Event):
-    user_id = event.sender_id
+    user_id = event.sender_id        
     amount = await db.ReadWalletUser(user_id)
     async with client.action(event.chat_id, 'typing'):
                     await asyncio.sleep(0.3)
@@ -510,8 +645,6 @@ async def backmenohandeler(event):
                     await event.reoly("عملیات با موفقیت کنسل شد ❌", buttons=keyboard)  
     user_cach.pop(user_id)
     user_step.pop(user_id)
-    
-
     
 @client.on(events.NewMessage(pattern="بازگشت 🔙"))
 async def backmenotexthandeler(event):
@@ -550,8 +683,9 @@ async def backmeno(event):
                     await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
     user_cach.pop(user_id)
     user_step.pop(user_id)
-  
-@client.on(events.NewMessage(pattern=r'https://t\.me/([\w\d_]+)/app\?startapp=(ref_[\w\d]+)'))
+    
+PATTERN = r'https://t\.me/([a-zA-Z0-9_-]+)/app\?startapp=(ref_[\w\d]+)'
+@client.on(events.NewMessage(pattern=PATTERN))
 async def handler(event):
     user_id = event.sender.id
     user = await db.ReadUserByUserId(user_id)
@@ -561,10 +695,15 @@ async def handler(event):
         if match:
             username = match.group(1)
             ref = match.group(2)
-            username1 = await db.read_referrabot_name(username)
-            async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.reply(f"آیدی: @{username1}\nقیمت: {None}\nکد دعوت: {ref}")
+            x = await db.read_referrabotbyname(username)
+            if x:
+                async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        namee = x[0]
+                        user_cach[user_id] = {"name": namee}
+                        user_step[user_id] = "read_balance_"+namee
+                        key = keys.key_order_ref(int(float(x[2])),namee,count=1)
+                        await event.reply(ConstText.order.format(x[0],f"a{username}",ref,{None},int(float(x[2]))),buttons=key,parse_mode="HTML")
         
             
 # -------------------------------  admin -------------------------------
@@ -573,27 +712,31 @@ async def handler(event):
 
 @client.on(events.NewMessage(pattern="کلید رفرال 📍"))
 async def update_card(event):
-    keyboard = keys.refferal_key()
-    async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.respond("یکی از موارد زیر را انتخاب کنید 🙏🏻",buttons=keyboard)
+    user_id = event.sender_id
+    admin = await db.ReadAdmin(user_id)
+    if admin:
+        keyboard = keys.refferal_key()
+        async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.respond("یکی از موارد زیر را انتخاب کنید 🙏🏻",buttons=keyboard)
 
 @client.on(events.NewMessage(pattern="آپلود سشن 📤"))
 async def update_card(event):
     global user_step, user_cach
     user_id = event.sender_id
-    keyboard = keys.cancel()
-    async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.respond("فایل سشن تلتون خود را ارسال نمایید 🙏🏻",buttons=keyboard)
-                    user_step[user_id] = "get_session"
+    admin = await db.ReadAdmin(user_id)
+    if admin:
+        keyboard = keys.cancel()
+        async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.respond("فایل سشن تلتون خود را ارسال نمایید 🙏🏻",buttons=keyboard)
+                        user_step[user_id] = "get_session"
 
 @client.on(events.NewMessage(pattern="^پیام همگانی ✉️$"))
 async def send_message_channel(event: events.NewMessage.Event):
     try:
         global user_step, user_cach
         user_id = event.sender_id
-
         AnyAdmin = await db.ReadAdmin(user_id)
         if AnyAdmin:
             AcsessType = await db.ReadAccessTypesByUserId(user_id)
@@ -611,50 +754,48 @@ async def send_message_channel(event: events.NewMessage.Event):
 
     except Exception as e:
         print(f"Error: {e}")
-
-@client.on(events.NewMessage())
-async def handle_send_messege(event: events.NewMessage.Event):
-    global user_step, user_cach
-    user_id = event.sender_id
-    if user_id in user_step:
-        step = user_step[user_id]
-        message_text = event.text
-        if step == "awaiting_message_text" and message_text != "پیام همگانی ✉️":
-            user_cach[user_id]["message_text"] = message_text
-            users = await db.read_users()
-            async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-            Msgg = await event.respond("در حال ارسال پیام به کاربران⏳")
-            for user in users:
-                try:
-                    await client.send_message(int(user[1]), message_text)
-                except Exception as user_error:
-                    print(f"خطا در ارسال پیام به کاربر {user[1]}: {user_error}")
-
-            await Msgg.delete()
-            keyboard = keys.key_start_sudo()
-            async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.respond("پیام مورد نظر با موفقیت ارسال شد✅",buttons=keyboard)
-            user_step.pop(user_id, None)
-            user_cach.pop(user_id, None)
             
 @client.on(events.NewMessage(pattern="➕ ساخت کلید 🔑"))
 async def start_create_referrabot(event):
     user_id = event.sender_id
     global user_step,user_cach
-    if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
-        return
-    user_step[user_id] = "name" 
-    user_cach[user_id] = {}
-    keyboard = keys.Back_menu()
-    async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.respond("لطفاً نام ربات را وارد کنید 🙏🏻",buttons=keyboard)
+    user_id = event.sender_id
+    admin = await db.ReadAdmin(user_id)
+    if admin:
+        if user_id in user_step:
+            user_step.pop(user_id)
+            user_cach.pop(user_id)
+            return
+        user_step[user_id] = "name" 
+        user_cach[user_id] = {}
+        keyboard = keys.Back_menu()
+        async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.respond("لطفاً نام ربات را وارد کنید 🙏🏻",buttons=keyboard)
 
-@client.on(events.NewMessage(pattern="^شارژ حساب کاربر ➕$"))
+@client.on(events.NewMessage(pattern="حذف حساب شارژ 🗑"))
+async def charge_account(event: events.NewMessage.Event):
+    global user_step, user_cach
+    user_id = event.sender_id
+
+    try:
+        AnyAdmin = await db.ReadAdmin(user_id)
+        if AnyAdmin:
+            # AcsessType = await db.ReadAccessTypesByUserId(user_id)
+            # if AcsessType[2] == 1:
+
+                user_cach[user_id] = {}
+                keyboard = keys.cancel() 
+                async with client.action(event.chat_id, 'typing'):
+                    await asyncio.sleep(0.3)
+                    await event.respond("یوزر آیدی شخص مورد نظر رو ارسال کن 🙏🏻", buttons=keyboard)
+                user_step[user_id] = "user_id_delete" 
+        else:
+            await event.reply(ConstText.noacsess)
+    except Exception as e:
+        print(f"Error: {e}")
+
+@client.on(events.NewMessage(pattern="کسر حساب ➖"))
 async def charge_account(event: events.NewMessage.Event):
     global user_step, user_cach
     user_id = event.sender_id
@@ -663,9 +804,31 @@ async def charge_account(event: events.NewMessage.Event):
 
         AnyAdmin = await db.ReadAdmin(user_id)
         if AnyAdmin:
-            AcsessType = await db.ReadAccessTypesByUserId(user_id)
-            if AcsessType[2] == 1:
+            # AcsessType = await db.ReadAccessTypesByUserId(user_id)
+            # if AcsessType[2] == 1:
 
+                user_cach[user_id] = {}
+                keyboard = keys.cancel() 
+                async with client.action(event.chat_id, 'typing'):
+                    await asyncio.sleep(0.3)
+                    await event.respond("یوزر آیدی شخص مورد نظر رو ارسال کن 🙏🏻", buttons=keyboard)
+                user_step[user_id] = "user_id_neg" 
+        else:
+            await event.reply(ConstText.noacsess)
+    except Exception as e:
+        print(f"Error: {e}")
+
+@client.on(events.NewMessage(pattern="شارژ حساب ➕"))
+async def charge_account(event: events.NewMessage.Event):
+    global user_step, user_cach
+    user_id = event.sender_id
+
+    try:
+
+        AnyAdmin = await db.ReadAdmin(user_id)
+        if AnyAdmin:
+            # AcsessType = await db.ReadAccessTypesByUserId(user_id)
+            # if AcsessType[2] == 1:
                 user_cach[user_id] = {}
                 keyboard = keys.cancel() 
                 async with client.action(event.chat_id, 'typing'):
@@ -676,72 +839,141 @@ async def charge_account(event: events.NewMessage.Event):
             await event.reply(ConstText.noacsess)
     except Exception as e:
         print(f"Error: {e}")
+        
+@client.on(events.NewMessage(pattern="حساب کاربر 👤"))
+async def charge_account(event: events.NewMessage.Event):
+    global user_step, user_cach
+    user_id = event.sender_id
+
+    try:
+        AnyAdmin = await db.ReadAdmin(user_id)
+        if AnyAdmin:
+            # AcsessType = await db.ReadAccessTypesByUserId(user_id)
+            # if AcsessType[2] == 1:
+                async with client.action(event.chat_id, 'typing'):
+                    await asyncio.sleep(0.3)
+                    keyboard = keys.key_charg_user()
+                    await client.send_message(user_id,"<blockquote>حساب کاربران 👥</blockquote>پنل مدیریت حساب کاربران خوش آمدید 🤗",buttons=keyboard)
+        else:
+            await event.reply(ConstText.noacsess)
+    except Exception as e:
+        print(f"Error: {e}")
+
+@client.on(events.NewMessage(pattern="مسدود کردن 🔴"))
+async def charge_account(event: events.NewMessage.Event):
+    global user_step, user_cach
+    user_id = event.sender_id
+
+    try:
+
+        AnyAdmin = await db.ReadAdmin(user_id)
+        if AnyAdmin:
+            # AcsessType = await db.ReadAccessTypesByUserId(user_id)
+            # if AcsessType[2] == 1:
+
+                user_cach[user_id] = {}
+                keyboard = keys.cancel() 
+                async with client.action(event.chat_id, 'typing'):
+                    await asyncio.sleep(0.3)
+                    await event.respond("یوزر آیدی شخص مورد نظر رو ارسال کن 🙏🏻", buttons=keyboard)
+                user_step[user_id] = "block_user_id" 
+        else:
+            await event.reply(ConstText.noacsess)
+    except Exception as e:
+        print(f"Error: {e}")
+
+@client.on(events.NewMessage(pattern="رفع مسدودیت 🟢"))
+async def charge_account(event: events.NewMessage.Event):
+    global user_step, user_cach
+    user_id = event.sender_id
+
+    try:
+
+        AnyAdmin = await db.ReadAdmin(user_id)
+        if AnyAdmin:
+            # AcsessType = await db.ReadAccessTypesByUserId(user_id)
+            # if AcsessType[2] == 1:
+                user_cach[user_id] = {}
+                keyboard = keys.cancel() 
+                async with client.action(event.chat_id, 'typing'):
+                    await asyncio.sleep(0.3)
+                    await event.respond("یوزر آیدی شخص مورد نظر رو ارسال کن 🙏🏻", buttons=keyboard)
+                user_step[user_id] = "unblock_user_id" 
+        else:
+            await event.reply(ConstText.noacsess)
+    except Exception as e:
+        print(f"Error: {e}")
 
 @client.on(events.NewMessage(pattern="^مشتریان و گزارشات 📎$"))
 async def log(event: events.NewMessage.Event):
     user_id = event.sender_id
-    
-    try:
-        log = await db.read_users()
 
-        # باز کردن فایل با encoding 'utf-8'
-        with open("log.txt", "a", encoding="utf-8") as wp:
-            for i in log:
-                if len(i) >= 8:
-                    wp.write(f"ID: {i[0]} \\ user_id: {i[1]} \\ Name: {i[2]} \\ Username: {i[3]} \\ WALLET: {i[4]}\n")
-                    wp.write(f"REFFERAL: {i[5]} \\ Score: {i[6]} \\ BLOCK: {i[7]}\n\n")
-                else:
-                    print(f"Error: Tuple has fewer than 8 elements: {i}")
+    admin = await db.ReadAdmin(user_id)
+    if admin:
+        try:
+            log = await db.read_users()
 
-        if os.path.exists("log.txt"):
-            async with client.action(event.chat_id, 'document'):
-                    await asyncio.sleep(0.3)
-                    await client.send_file(
-                event.chat_id,
-                "log.txt",
-                caption="لیست گزارشات"
-            )
-            os.remove("log.txt")
-        else:
-            await event.respond("فایل گزارشات پیدا نشد.")
-    
-    except Exception as e:
-        print(f"Error: {e}")
-        await event.respond("خطایی رخ داد. لطفاً دوباره تلاش کنید.")
+            # باز کردن فایل با encoding 'utf-8'
+            with open("log.txt", "a", encoding="utf-8") as wp:
+                for i in log:
+                    if len(i) >= 8:
+                        wp.write(f"ID: {i[0]} \\ user_id: {i[1]} \\ Name: {i[2]} \\ Username: {i[3]} \\ WALLET: {i[4]}\n")
+                        wp.write(f"REFFERAL: {i[5]} \\ Score: {i[6]} \\ BLOCK: {i[7]}\n\n")
+                    else:
+                        print(f"Error: Tuple has fewer than 8 elements: {i}")
+
+            if os.path.exists("log.txt"):
+                async with client.action(event.chat_id, 'document'):
+                        await asyncio.sleep(0.3)
+                        await client.send_file(
+                    event.chat_id,
+                    "log.txt",
+                    caption="لیست گزارشات"
+                )
+                os.remove("log.txt")
+            else:
+                await event.respond("فایل گزارشات پیدا نشد.")
+        
+        except Exception as e:
+            print(f"Error: {e}")
+            await event.respond("خطایی رخ داد. لطفاً دوباره تلاش کنید.")
 
 @client.on(events.NewMessage(pattern="^آپدیت قیمت 📌$"))
 async def update_balnce(event):
-    user_id = event.sender_id
     global user_step, user_cach
-    
-    if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
-        return
-    
-    user_step[user_id] = "namee" 
-    user_cach[user_id] = {}
-    keyboard = keys.Back_menu()
-    async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.respond("لطفاً نام ربات را وارد کنید 😊",buttons=keyboard)
+    user_id = event.sender_id
+    admin = await db.ReadAdmin(user_id)
+    if admin:
+        
+        if user_id in user_step:
+            user_step.pop(user_id)
+            user_cach.pop(user_id)
+            return
+        
+        user_step[user_id] = "namee" 
+        user_cach[user_id] = {}
+        keyboard = keys.Back_menu()
+        async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.respond("لطفاً نام ربات را وارد کنید 😊",buttons=keyboard)
 
 @client.on(events.NewMessage(pattern="➖ حذف کلید 🔑"))
 async def delete_refferal_bot(event):
     user_id = event.sender_id
     global user_step, user_cach
-    
-    if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
-        return
-    
-    user_step[user_id] = "nam" 
-    user_cach[user_id] = {}
-    keyboard = keys.Back_menu()
-    async with client.action(event.chat_id, 'typing'):
-                    await asyncio.sleep(0.3)
-                    await event.respond("لطفاً نام ربات را وارد کنید 😊",buttons=keyboard)
+    admin = await db.ReadAdmin(user_id)
+    if admin:
+        if user_id in user_step:
+            user_step.pop(user_id)
+            user_cach.pop(user_id)
+            return
+        
+        user_step[user_id] = "nam" 
+        user_cach[user_id] = {}
+        keyboard = keys.Back_menu()
+        async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.respond("لطفاً نام ربات را وارد کنید 😊",buttons=keyboard)
         
 @client.on(events.NewMessage(pattern="♾️ نمایش کلید ها 🔑"))
 async def show_ref_bot(event):
@@ -819,6 +1051,73 @@ async def callback_handler(event):
                             await event.edit("پرداخت انجام نشد ❌",buttons=buttons)
         except TypeError:
                 pass
+    
+    order_step = user_step[user_id]
+    
+    if "read_balance_" in order_step:
+        name = order_step.replace("read_balance_","")
+        
+        if "plus_" in data:
+            i = int(data.replace("plus_",""))
+            balanc = await db.read_balance_referrabotbyname(name)
+            i = i + 1
+            user_cach[user_id] = {"i": i}
+            balanc = int(float(balanc[0]))
+            
+            keyboard = keys.key_order_ref(balanc,name,i)
+            await event.edit(buttons=keyboard)
+        
+    order_step = user_step[user_id]
+    
+    if "read_balance_" in order_step:
+        name = order_step.replace("read_balance_","")
+        if "neg_" in data:
+            balanc = await db.read_balance_referrabotbyname(name)
+            balanc = int(float(balanc[0]))
+            
+            i = int(data.replace("neg_",""))
+            i = i - 1
+            if i >= 1:
+                balanc = balanc * i
+                keyboard = keys.key_order_ref(balanc,name,i)
+                await event.edit(buttons=keyboard)
+            else:
+                if i == 1:
+                    i = 1
+                    balanc = balanc * i
+                    balanc = int(float(balanc[0]))
+                    keyboard = keys.key_order_ref(balanc,name,i)
+                    await event.edit(buttons=keyboard)
+    
+    order_step = user_step[user_id]
+    
+    if "read_balance_" in order_step:
+        name = order_step.replace("read_balance_","")
+        if "do_" in data:
+            i = int(data.replace("do_",""))
+            balanc = await db.read_balance_referrabotbyname(name)
+            balanc = int(float(balanc[0]))
+            balanc = balanc * i
+            keyboard = keys.key_order_ref(balanc,name,i)
+            await event.edit(buttons=keyboard)
+            
+    order_step = user_step[user_id]
+        
+    if "read_balance_" in order_step:
+        name = order_step.replace("read_balance_","")
+
+        if "accept_order" in data:
+            balanc = await db.read_balance_referrabotbyname(name)
+            balanc = int(float(balanc[0]))
+            incach = await db.ReadUserByUserId(user_id)
+            incach = incach[4]
+            if incach >= balanc:
+                pass
+            else:
+                await event.edit("💰 اعتبار شما کافی نیست بعد از شارژ اعتبار دوباره اقدام کنید")
+                user_step.pop(user_id)
+                user_cach.pop(user_id)
+    
 
     if "back" in data:
         keyboard=keys.Back_Reply()
@@ -830,7 +1129,6 @@ async def callback_handler(event):
 
 async def run():
     await db.create_database()
-    
     for i in [6785692975, 400395713]:
         isany = await db.ReadAdmin(i)
         if isany is None:
