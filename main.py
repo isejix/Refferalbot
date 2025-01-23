@@ -99,7 +99,7 @@ async def start_bot(event):
                     if user:
                         async with client.action(event.chat_id, 'typing'):
                             await asyncio.sleep(0.3)
-                            await event.respond(
+                            await event.reply(
                                 ConstText.StartMsg.format(event.sender.first_name),
                                 buttons=keys.key_start_user()
                             )
@@ -130,7 +130,6 @@ async def start_bot(event):
             else:
                 pass
         except Exception as e:
-            # ارسال لاگ خطای کلی
             await log_to_channel(event, action=f"خطای کلی: {e}")
 
     else:
@@ -138,7 +137,7 @@ async def start_bot(event):
         if rolle == 1: 
             async with client.action(event.chat_id, 'typing'):
                 await asyncio.sleep(0.3)
-                await event.respond(
+                await event.reply(
                     ConstText.StartMsg_sudo.format(event.sender.first_name),
                     buttons=keys.key_start_sudo()
                 )
@@ -265,7 +264,6 @@ async def process(event):
 
         if current_step == "namee" and namee != "آپدیت قیمت 📌":
             try:
-                await log_to_channel(event, "کاربر رو دکمه آپدیت قیمت 📌 کلیک کرد")
                 user_cach[user_id]["namee"] = namee
                 if user_cach[user_id]["namee"]  == "منو قبل 🔙":
                     await log_to_channel(event, "کاربر روی دکمه منو قبل 🔙 کلیک کرد")
@@ -278,38 +276,109 @@ async def process(event):
                         await log_to_channel(event, "کاربر به منو قبل بازگشت")
                     return
                 if namee.isdigit():
-                    if user_cach[user_id]["namee"]  == "منو قبل 🔙":
-                            await log_to_channel(event, "کاربر روی قبل 🔙 کلیک کرد")
+                    async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.respond("نام اشتباه وارد شده است 🔴")
+                        await log_to_channel(event, "کاربر نام اشتباه وارد کرد")
+                    
+                    
+                user_step[user_id] = "balancee"
+                is_valid = await db.read_referrabot_name(user_cach[user_id]["namee"])
+                if is_valid:
+                    async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.respond("لطفاً قیمت جدید را به تومان وارد کنید 🙏🏻")
+                        await log_to_channel(event, "کاربر قیمت جدید رو وارد کرد")
+                
+                else:
+                    async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.respond(" این نام در دیتابیس وجود ندارد 🔴")
+                        await log_to_channel(event, "کاربر نام اشتباه وارد کرد")
+            except Exception as e:
+                await log_to_channel(event,str(e))  
+                
+        if current_step == "balancee":
+            try:
+                if event.text.isdigit():
+                    try:
+                        balancee = float(event.text)
+                        user_cach[user_id]["balancee"] = balancee
+
+                        if user_cach[user_id]["balancee"] == "منو قبل 🔙":
                             user_step.pop(user_id)
                             user_cach.pop(user_id)
                             keyboard = keys.refferal_key()
                             async with client.action(event.chat_id, 'typing'):
                                 await asyncio.sleep(0.3)
                                 await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
-                                await log_to_channel(event, "کاربر به منو قبل بازگشت")   
+                            await log_to_channel(
+                                event,
+                                action="کاربر به منوی قبلی بازگشت."
+                            )
                             return
-                    user_step[user_id] = "balancee"
-                    is_valid = await db.read_referrabot_name(user_cach[user_id]["namee"])
-                    if is_valid:
+
+                        user_step[user_id] = "completed"
+                        await db.Updatebalancereferal(user_cach[user_id]['namee'], user_cach[user_id]['balancee'])
+
+                        keyboard = keys.refferal_key()
                         async with client.action(event.chat_id, 'typing'):
                             await asyncio.sleep(0.3)
-                            await event.respond("لطفاً قیمت جدید را به تومان وارد کنید 🙏🏻")
-                            await log_to_channel(event, "کاربر قیمت جدید رو وارد کرد")
-                            
-                    else:
-                        async with client.action(event.chat_id, 'typing'):
-                            await asyncio.sleep(0.3)
-                            await event.respond("نام اشتباه وارد شده است 🔴")
-                            await log_to_channel(event, "کاربر نام اشتباه وارد کرد")
-                            
+                            await client.send_message(user_id,
+                                f"""<blockquote>قیمت آپدیت شد 💰</blockquote>
+                                قیمت ربات آپدیت شد ✅\n
+                                نام: {user_cach[user_id]['namee']} 📎\n
+                                قیمت جدید: {int(float(balancee))} 💰
+                                """,
+                                buttons=keyboard,
+                                parse_mode="HTML"
+                            )
+
+                            await log_to_channel(
+                                event,
+                                action=f"اطلاعات ربات ذخیره شد: نام={user_cach[user_id]['name']}\nقیمت={balance}"
+                            )
+
+                        user_step.pop(user_id)
+                        user_cach.pop(user_id)
+                    except ValueError as e:
+
+                        await log_to_channel(
+                            event,
+                            action=f"خطا در تبدیل ورودی قیمت به عدد: {e}"
+                        )
+
+                elif event.text == "منو قبل 🔙":
+                    user_step.pop(user_id)
+                    user_cach.pop(user_id)
+                    keyboard = keys.refferal_key()
+                    async with client.action(event.chat_id, 'typing'):
+                        await asyncio.sleep(0.3)
+                        await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
+
+                    await log_to_channel(
+                        event,
+                        action="کاربر به منوی قبلی بازگشت."
+                    )
+                    return
+
                 else:
                     async with client.action(event.chat_id, 'typing'):
                         await asyncio.sleep(0.3)
-                        await event.respond("مقدار ورودی شما اشتباه میباشد لطفا عدد وارد کنید 🙏🏻")
-                        await log_to_channel(event, "کاربر مقدار ورودی اشتباه وارد کرد")
+                        await event.respond("لطفاً قیمت را به‌صورت عدد وارد کنید.")
+
+
+                    await log_to_channel(
+                        event,
+                        action="کاربر وارد عدد نامعتبر شد برای قیمت."
+                    )
             except Exception as e:
-                await log_to_channel(event,str(e))    
-                       
+
+                await log_to_channel(
+                    event,
+                    action=f"خطا در پردازش قیمت: {e}"
+                ) 
+                
         name = event.text
         
         if user_step[user_id] == "منو قبل 🔙":
@@ -327,16 +396,12 @@ async def process(event):
         
         if current_step == "name" and name != "➕ ساخت کلید 🔑":
             try:
-                await log_to_channel(event, action="کاربر روی دکمه ➕ ساخت کلید 🔑 کلیک کرد")
-                
                 user_id = event.sender_id
                 user_cach[user_id]["name"] = name
-
                 if user_cach[user_id]["name"] == "منو قبل 🔙":
                     user_step.pop(user_id)
                     user_cach.pop(user_id)
                     keyboard = keys.refferal_key()
-
                     async with client.action(event.chat_id, 'typing'):
                         await asyncio.sleep(0.3)
                         await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
@@ -386,7 +451,7 @@ async def process(event):
 
         if current_step == "balance":
             try:
-                if event.text.isdigit():  # بررسی اینکه ورودی عددی است
+                if event.text.isdigit():
                     try:
                         balance = float(event.text)
                         user_cach[user_id]["balance"] = balance
@@ -412,10 +477,9 @@ async def process(event):
                             await asyncio.sleep(0.3)
                             await event.respond(
                                 f"اطلاعات ربات ذخیره شد:\nنام: {user_cach[user_id]['name']}\nیوزرنیم: {user_cach[user_id]['username']}\nقیمت: {balance}",
-                                buttons=keyboard
+                                buttons=keyboard, 
                             )
 
-                        # لاگ موفقیت‌آمیز ذخیره اطلاعات
                         await log_to_channel(
                             event,
                             action=f"اطلاعات ربات ذخیره شد: نام={user_cach[user_id]['name']}, یوزرنیم={user_cach[user_id]['username']}, قیمت={balance}"
@@ -424,7 +488,7 @@ async def process(event):
                         user_step.pop(user_id)
                         user_cach.pop(user_id)
                     except ValueError as e:
-                        # لاگ خطا برای ورودی نامعتبر
+
                         await log_to_channel(
                             event,
                             action=f"خطا در تبدیل ورودی قیمت به عدد: {e}"
@@ -438,7 +502,6 @@ async def process(event):
                         await asyncio.sleep(0.3)
                         await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
 
-                    # لاگ برای بازگشت به منو قبلی
                     await log_to_channel(
                         event,
                         action="کاربر به منوی قبلی بازگشت."
@@ -450,24 +513,21 @@ async def process(event):
                         await asyncio.sleep(0.3)
                         await event.respond("لطفاً قیمت را به‌صورت عدد وارد کنید.")
 
-                    # لاگ خطا برای ورودی غیر عددی
+
                     await log_to_channel(
                         event,
                         action="کاربر وارد عدد نامعتبر شد برای قیمت."
                     )
             except Exception as e:
-                # لاگ برای خطای عمومی
+
                 await log_to_channel(
                     event,
                     action=f"خطا در پردازش قیمت: {e}"
                 )
-
-                
-
                 
         if current_step == "user_id":
             try:
-                user_id_input = event.text
+                user_id_input = event.text.replace('`','')
                 if user_id_input.isdigit():
                     user_cach[user_id] = {"user_id": user_id_input}
                     user_step[user_id] = "charge_amount"
@@ -475,7 +535,7 @@ async def process(event):
                         await asyncio.sleep(0.3)
                         await event.reply("💶 جهت افزایش موجودی حساب مبلغ مورد نظر خود را به تومان وارد نمایید:")
 
-                    # ارسال لاگ در هنگام دریافت user_id معتبر
+
                     await log_to_channel(
                         event,
                         action=f"شناسه کاربری {user_id_input} وارد شد و کاربر آماده شارژ موجودی است."
@@ -483,8 +543,7 @@ async def process(event):
 
                 else:
                     await event.reply("شناسه کاربری وارد شده معتبر نیست. لطفا یک شناسه عددی وارد کنید.")
-                    
-                    # ارسال لاگ برای شناسه کاربری نامعتبر
+
                     await log_to_channel(
                         event,
                         action=f"شناسه کاربری وارد شده نامعتبر بود: {user_id_input}"
@@ -494,8 +553,15 @@ async def process(event):
                         event,
                         action=e
                     )
-
-        elif current_step == "charge_amount":
+        else:
+                    await event.reply("شناسه کاربری وارد شده معتبر نیست. لطفا یک شناسه عددی وارد کنید.")
+         
+                    await log_to_channel(
+                        event,
+                        action="شناسه کاربری وارد شده معتبر نیست."
+                    )
+        
+        if current_step == "charge_amount":
             try:
                 charge_amount = event.text
                 if charge_amount.isdigit():
@@ -508,13 +574,13 @@ async def process(event):
                             new_balance = current_balance[0] + charge_amount
                             await db.UpdateWalletUser(stored_user_id, new_balance)
 
-                            keyboard = keys.key_start_sudo()
+                            keyboard = keys.key_charg_user()
                             async with client.action(event.chat_id, 'typing'):
                                 await asyncio.sleep(0.3)
                                 await event.reply(f"مقدار {charge_amount} حساب کاربر {stored_user_id} با موفقیت  شارژ شد ✅", buttons=keyboard)
                             await client.send_message(int(stored_user_id), f"مقدار {charge_amount} حساب شما شارژ شد ✅")
 
-                            # ارسال لاگ برای شارژ موفق حساب کاربر
+
                             await log_to_channel(
                                 event,
                                 action=f"مقدار {charge_amount} تومان به حساب کاربر {stored_user_id} اضافه شد."
@@ -524,13 +590,11 @@ async def process(event):
                             user_cach.pop(user_id, None)
                         else:
                             await event.reply("خطا در دریافت موجودی کاربر. لطفا دوباره تلاش کنید.")
-                            # ارسال لاگ خطا در دریافت موجودی
                             await log_to_channel(
                                 event,
                                 action=f"خطا در دریافت موجودی برای شناسه کاربری {stored_user_id}."
                             )
                     except Exception as e:
-                        # ارسال لاگ خطا در فرآیند شارژ
                         await log_to_channel(
                             event,
                             action=f"خطا در بروزرسانی موجودی حساب کاربر {stored_user_id}: {str(e)}"
@@ -539,20 +603,18 @@ async def process(event):
                 else:
                     await event.reply("لطفا یک مقدار عددی معتبر وارد کنید.")
 
-                    # ارسال لاگ برای مقدار نامعتبر
                     await log_to_channel(
                         event,
                         action=f"کاربر مقدار نامعتبری برای شارژ وارد کرد: {charge_amount}"
                     )
 
             except Exception as e:
-                # ارسال لاگ خطا برای هر گونه استثناء در کل فرایند
+
                 await log_to_channel(
                     event,
                     action=f"خطای کلی: {str(e)}"
                 )
                 await event.reply("خطای ناشناخته‌ای رخ داده است. لطفا دوباره تلاش کنید.")
-
 
         if current_step == "get_session":
             try:
@@ -569,7 +631,7 @@ async def process(event):
 
                             if not session_files:
                                 await event.respond("هیچ فایل سشن (.session) درون فایل zip یافت نشد.")
-                                # ارسال لاگ
+
                                 await log_to_channel(event, action="هیچ فایل سشن در فایل zip یافت نشد.")
                                 return
 
@@ -635,25 +697,25 @@ async def process(event):
                                         async with client.action(event.chat_id, 'typing'):
                                             await asyncio.sleep(0.3)
                                             await event.respond("پوشه سشن خالی است.")
-                                        # ارسال لاگ
+                
                                         await log_to_channel(event, action="پوشه سشن خالی است.")
                                 else:
                                     async with client.action(event.chat_id, 'typing'):
                                         await asyncio.sleep(0.3)
                                         await event.respond(f"مسیر '{folder_path}' وجود ندارد.")
-                                    # ارسال لاگ
+               
                                     await log_to_channel(event, action=f"مسیر '{folder_path}' وجود ندارد.")
                             else:
-                                # ارسال لاگ
+                 
                                 await log_to_channel(event, action="هیچ فایلی از فایل zip استخراج نشد.")
                         
                     except zipfile.BadZipFile:
                         await event.respond("فایل zip خراب است. لطفاً یک فایل معتبر آپلود کنید.")
-                        # ارسال لاگ
+    
                         await log_to_channel(event, action="فایل zip خراب است.")
                     
                     finally:
-                        # پاکسازی فایل‌ها و پوشه‌ها
+           
                         if os.path.exists(path):
                             os.remove(path)
                         if os.path.exists(folder_path):
@@ -663,23 +725,22 @@ async def process(event):
                     async with client.action(event.chat_id, 'typing'):
                         await asyncio.sleep(0.3)
                         await event.respond("فرمت فایل اشتباه است. لطفاً یک فایل zip ارسال نمایید.")
-                    # ارسال لاگ
+       
                     await log_to_channel(event, action="فرمت فایل ارسال شده اشتباه است. (نبودن zip)")
 
             except Exception as e:
-                # ارسال لاگ در صورت بروز هرگونه خطا
+
                 await log_to_channel(event, action=f"خطا در پردازش فایل سشن: {str(e)}")
                 print(f"خطا: {e}")
 
-
-        if current_step == "user_id_neg":
-            user_id_input = event.text
+        if current_step == "user_id_neg" and event.text.isdigit():
+            user_id_input = event.text.replace('`','')
             try:
                 if user_id_input.isdigit(): 
                     user_cach[user_id] = {"user_id": user_id_input}
                     user_step[user_id] = "kasr_charge_amount" 
                     
-                    # ارسال لاگ ورود شناسه کاربری
+
                     await log_to_channel(
                         event,
                         action=f"شناسه کاربری {user_id_input} وارد شد."
@@ -690,7 +751,7 @@ async def process(event):
                         await event.reply("چقدر می‌خواهید از حساب کاربر را کسر کنید؟")
                 else:
                     await event.reply("شناسه کاربری وارد شده معتبر نیست. لطفا یک شناسه عددی وارد کنید.")
-                    # ارسال لاگ خطا در وارد کردن شناسه
+         
                     await log_to_channel(
                         event,
                         action="شناسه کاربری وارد شده معتبر نیست."
@@ -701,20 +762,26 @@ async def process(event):
                     action=f"خطا در وارد کردن شناسه کاربری: {str(e)}"
                 )
                 await event.reply("خطا در پردازش اطلاعات. لطفاً دوباره تلاش کنید.")
-
-        elif current_step == "kasr_charge_amount":
+        else:
+                    await event.reply("شناسه کاربری وارد شده معتبر نیست. لطفا یک شناسه عددی وارد کنید.")
+         
+                    await log_to_channel(
+                        event,
+                        action="شناسه کاربری وارد شده معتبر نیست."
+                    )
+            
+        if current_step == "kasr_charge_amount" and event.text.isdigit() and not current_step == "user_id_neg" :
             try:
-                charge_amount = event.text
+                charge_amount = event.text.replace('`','')
                 if charge_amount.isdigit():
-                    charge_amount = int(charge_amount) 
+                    charge_amount = charge_amount
                     stored_user_id = user_cach[user_id]["user_id"]
-
                     current_balance = await db.ReadWalletUser(stored_user_id)
                     if current_balance:
                         new_balance = current_balance[0] - charge_amount
                         if new_balance < 0:
                             await event.reply("موجودی کافی برای کسر این مبلغ وجود ندارد.")
-                            # ارسال لاگ موجودی ناکافی
+           
                             await log_to_channel(
                                 event,
                                 action=f"موجودی ناکافی برای کسر {charge_amount} از حساب کاربر {stored_user_id}."
@@ -727,10 +794,10 @@ async def process(event):
                             await asyncio.sleep(0.3)
                             await event.reply(f"مقدار {charge_amount} حساب کاربر {stored_user_id} با موفقیت  کسر شد ✅", buttons=keyboard)
                         
-                        # ارسال پیام به کاربر
+           
                         await client.send_message(int(stored_user_id), f"مقدار {charge_amount} از حساب شما کسر شد ✅")
 
-                        # ارسال لاگ کسر موفق
+                 
                         await log_to_channel(
                             event,
                             action=f"مقدار {charge_amount} از حساب کاربر {stored_user_id} با موفقیت کسر شد."
@@ -740,14 +807,14 @@ async def process(event):
                         user_cach.pop(user_id, None)
                     else:
                         await event.reply("خطا در دریافت موجودی کاربر. لطفا دوباره تلاش کنید.")
-                        # ارسال لاگ خطا در دریافت موجودی
+                 
                         await log_to_channel(
                             event,
                             action=f"خطا در دریافت موجودی برای کاربر {stored_user_id}."
                         )
                 else:
                     await event.reply("لطفا یک مقدار عددی معتبر وارد کنید.")
-                    # ارسال لاگ ورودی غیرعدد
+                    
                     await log_to_channel(
                         event,
                         action="کاربر مقدار غیر عددی وارد کرد."
@@ -758,6 +825,13 @@ async def process(event):
                     action=f"خطا در پردازش کسر مبلغ: {str(e)}"
                 )
                 await event.reply("خطا در پردازش اطلاعات. لطفاً دوباره تلاش کنید.")
+        else:
+                    await event.reply("شناسه کاربری وارد شده معتبر نیست. لطفا یک شناسه عددی وارد کنید.")
+         
+                    await log_to_channel(
+                        event,
+                        action="شناسه کاربری وارد شده معتبر نیست."
+                    )
 
 
         if current_step == "user_delete":
@@ -766,40 +840,40 @@ async def process(event):
                 if user_id_input.isdigit():
                     user_cach[user_id] = {"user": user_id_input}
                     
-                    # حذف کاربر از دیتابیس
+        
                     await db.delete_user(user_cach[user_id]["user"])
 
-                    # ارسال پیام به ادمین
+  
                     keyboard = keys.key_start_sudo()
                     async with client.action(event.chat_id, 'typing'):
                         await asyncio.sleep(0.3)
                         await event.respond(f"حساب کاربری {user_cach[user_id]['user']} با موفقیت حذف شد✅", buttons=keyboard)
                     
-                    # ارسال لاگ موفقیت‌آمیز
+      
                     await log_to_channel(
                         event,
                         action=f"حساب کاربری {user_cach[user_id]['user']} با موفقیت حذف شد."
                     )
 
-                    # پاکسازی وضعیت و کش کاربر
+
                     user_step.pop(user_id, None)
                     user_cach.pop(user_id, None)
 
                 else:
-                    # ارسال پیام خطا در صورت وارد نکردن شناسه عددی
+               
                     await event.respond("شناسه کاربری وارد شده معتبر نیست. لطفاً یک شناسه عددی وارد کنید.")
                     
-                    # ارسال لاگ در صورت وارد نکردن شناسه عددی
+             
                     await log_to_channel(
                         event,
                         action="کاربر شناسه غیر عددی وارد کرد."
                     )
 
             except Exception as e:
-                # ارسال پیام خطا در صورت بروز هرگونه مشکل در فرآیند حذف
+   
                 await event.respond(f"خطا در حذف حساب کاربری: {str(e)}")
 
-                # ارسال لاگ در صورت بروز خطا
+      
                 await log_to_channel(
                     event,
                     action=f"خطا در حذف حساب کاربری {user_cach[user_id]['user']}: {str(e)}"
@@ -812,7 +886,7 @@ async def process(event):
                 if user_id_input.isdigit():
                     user_cach[user_id] = {"user": user_id_input}
                     
-                    # حذف حساب کاربر از دیتابیس
+
                     await db.delete_wallet_user(user_cach[user_id]["user"])
 
                     keyboard = keys.key_start_sudo()
@@ -820,23 +894,23 @@ async def process(event):
                         await asyncio.sleep(0.3)
                         await event.respond("حساب شارژ کاربر با موفقیت حذف شد✅", buttons=keyboard)
                     
-                    # ارسال لاگ برای حذف موفقیت‌آمیز حساب کاربر
+                
                     await log_to_channel(
                         event,
                         action=f"حساب شارژ کاربر با شناسه {user_cach[user_id]['user']} با موفقیت حذف شد."
                     )
 
-                    # پاکسازی وضعیت و کش کاربر
+             
                     user_step.pop(user_id, None)
                     user_cach.pop(user_id, None)
                 else:
                     await event.respond("شناسه کاربری وارد شده معتبر نیست. لطفا یک شناسه عددی وارد کنید.")
 
             except Exception as e:
-                # ارسال پیام خطا به کاربر در صورت بروز مشکل
+           
                 await event.respond("خطایی در حذف حساب شارژ کاربر رخ داده است. لطفا دوباره تلاش کنید.")
 
-                # ارسال لاگ خطا
+     
                 await log_to_channel(
                     event,
                     action=f"خطا در حذف حساب شارژ کاربر با شناسه {user_id_input}. خطا: {e}"
@@ -848,21 +922,21 @@ async def process(event):
             try:
                 if user_id.isdigit():
                     user_cach[user_id]["user_id"] = user
-                    await db.blockN_User(user, 1)  # مسدود کردن کاربر در دیتابیس
+                    await db.blockN_User(user, 1) 
                     keyboard = keys.key_start_sudo()
                     async with client.action(event.chat_id, 'typing'):
                         await asyncio.sleep(0.3)
                         await event.respond("حساب کاربر با موفقیت مسدود شد 🔴", buttons=keyboard)   
-                    # ارسال لاگ برای مسدود کردن کاربر
+          
                     await log_to_channel(
                         event,
                         action=f"حساب کاربر با شناسه {user_id} با موفقیت مسدود شد."
                     )
                 else:
-                    # ارسال پیام در صورتی که شناسه کاربری معتبر نباشد
+
                     await event.respond("شناسه کاربری وارد شده معتبر نیست. لطفا شناسه عددی وارد کنید.") 
             except Exception as e:
-                # در صورتی که خطایی رخ دهد، خطا به کانال لاگ ارسال می‌شود
+           
                 await log_to_channel(
                     event,
                     action=f"خطا در مسدود کردن حساب کاربر با شناسه {user_id}. خطا: {str(e)}"
@@ -872,17 +946,16 @@ async def process(event):
         if current_step == "unblock_user_id":
             try:
                 user_id = event.text
-                if user_id.isdigit():  # بررسی اینکه شناسه کاربر عددی باشد
+                if user_id.isdigit(): 
                     user_cach[user_id]["user_id"] = user_id
 
-                    # رفع مسدودیت کاربر در دیتابیس
                     await db.blockN_User(user_id, 0)    
-                    # ارسال پیام موفقیت‌آمیز به ادمین
+          
                     keyboard = keys.key_start_sudo()
                     async with client.action(event.chat_id, 'typing'):
                         await asyncio.sleep(0.3)
                         await event.respond("حساب کاربر با موفقیت رفع مسدودیت شد 🟢", buttons=keyboard) 
-                    # ارسال لاگ در صورت موفقیت
+
                     await log_to_channel(
                         event,
                         action=f"حساب کاربر با شناسه {user_id} با موفقیت رفع مسدودیت شد."
@@ -890,13 +963,13 @@ async def process(event):
                 else:
                     await event.respond("شناسه کاربری وارد شده معتبر نیست. لطفاً یک شناسه عددی وارد کنید.")  
             except Exception as e:
-                # مدیریت خطا و ارسال آن به کانال لاگ
+
                 await log_to_channel(
                     event,
                     action=f"خطا در فرآیند رفع مسدودیت کاربر با شناسه {user_id}: {str(e)}"
                 )
                 await event.respond("خطا در انجام عملیات رفع مسدودیت. لطفاً دوباره تلاش کنید.")  
-        # ادامه کد برای پردازش متنی دیگر
+
         step = user_step[user_id]
         message_text = event.text   
         if step == "awaiting_message_text" and message_text != "پیام همگانی ✉️":
@@ -1502,12 +1575,12 @@ async def handler(event):
                         await asyncio.sleep(0.3)
 
                         # ذخیره اطلاعات در حافظه و پیشروی وضعیت
-                        namee = x[0]
-                        user_cach[user_id] = {"name": namee}
-                        user_step[user_id] = "read_balance_" + namee
+                        namaaa = x[0]
+                        user_cach[user_id] = {"name": namaaa}
+                        user_step[user_id] = "read_balance_" + namaaa
                         
                         # ایجاد کلید سفارش
-                        key = keys.key_order_ref(int(float(x[2])), namee, count=1)
+                        key = keys.key_order_ref(int(float(x[2])), namaaa, count=1)
                         
                         # ارسال پیام به کاربر
                         await event.reply(

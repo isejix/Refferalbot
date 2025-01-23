@@ -30,7 +30,9 @@ def key_charg_user():
         
         [Button.text("کسر حساب ➖",resize=True), Button.text("شارژ حساب ➕",resize=True)],
         [Button.text("حذف حساب شارژ 🗑",resize=True),Button.text("حذف حساب کاربر 🗑",resize=True)],
-        [Button.text("مسدود کردن 🔴",resize=True),Button.text("رفع مسدودیت 🟢",resize=True)]
+        [Button.text("مسدود کردن 🔴",resize=True),Button.text("رفع مسدودیت 🟢",resize=True)],
+        [Button.text("بازگشت 🔙", resize=True)]
+        
         
     ]
     
@@ -104,7 +106,7 @@ def key_read_button_refferalbot(referalls, page=1, page_size=30):
         key.append([
             Button.inline(f"✅ {i[0]})", data=f"counter_{i[0]}"),
             Button.url(f"{i[1]}", url=f"{i[2]}"),
-            Button.inline(f"{i[3]}", data=f"price_{i[0]}"),
+            Button.inline(f"{i[3]}", data=f"price_{int(float(i[0]))}"),
         ])
 
     navigation_buttons = []

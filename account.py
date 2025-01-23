@@ -19,7 +19,6 @@ async def check_status_sessions(session):
     client = TelegramClient(session, api_id, api_hash)
     try:
         await client.connect()
-        
         # چک کردن اینکه سشن معتبر است یا نه
         if not await client.is_user_authorized():
             print(f"Session {session} is not authorized.")

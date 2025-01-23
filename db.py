@@ -270,7 +270,7 @@ async def create_referrabot(botname:str, username:str, balance: float ):
             INSERT INTO referrabots (botname, username, balance)
             VALUES (?, ?, ?);
             """,
-            (str(botname), str(username), float(balance)),
+            (str(botname), str(username), int(float(balance))),
         )
         await db.commit()
 
