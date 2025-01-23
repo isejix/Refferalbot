@@ -19,7 +19,7 @@ def key_start_sudo():
         
         [Button.text("مدیریت ربات ها📍",resize=True), Button.text("آپلود سشن 📤",resize=True)],
         [Button.text("پیام همگانی ✉️",resize=True), Button.text("حساب کاربر 👤",resize=True)],
-        [Button.text("مشتریان و گزارشات 📎",resize=True),Button.text("کد تخفیف 🈹",resize=True)]
+        [Button.text("مشتریان و گزارشات 📎",resize=True),Button.text("کد تخفیف 🏷",resize=True)]
     ]
     
     return keyboard
@@ -159,6 +159,11 @@ def key_order_ref(balance,namee,count=1):
             Button.inline("ثبت سفارش ✅", data="accept_order"),
                     
                 ]
+                ,
+                [
+            Button.inline("کد تخفیف 🏷", data="discount_"),
+                    
+                ]
     ]
     return keyboard
     
@@ -168,3 +173,11 @@ def key_chanell_notif():
         [Button.url("کانال گزارشات 🆔", url='https://t.me/refferall_bo')]
     ]
     return keyboard    
+
+def key_discouny():
+    
+    keyboard = [
+        [Button.text("حذف تخفیف 🗑", resize=True),Button.text("ثبت تخفیف 🟢", resize=True)],
+        [Button.text("بازگشت 🔙", resize=True)]
+    ]
+    return keyboard

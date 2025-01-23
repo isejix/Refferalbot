@@ -10,12 +10,16 @@ import  re
 import zipfile
 import shutil
 import account
+import random
+import string
 from datetime import date
 from telethon.tl.types import SendMessageTypingAction
 import asyncio
 import sqlite3
 from telethon.tl.functions.channels import GetParticipantsRequest
 from telethon.tl.types import ChannelParticipantsSearch
+import jdatetime
+
 
 api_id = 2631644
 api_hash = '2a0dec0b80b84e501c5d9806248eb235'
@@ -78,6 +82,45 @@ async def log_to_channel(event, action=None):
     except Exception as e:
         print(f"خطا در ارسال لاگ: {e}")
 
+def generate_discount_code():
+    length = 10
+    characters = string.ascii_letters + string.digits
+    discount_code = "".join(random.choices(characters, k=length))
+    return discount_code
+
+def get_persian_date():
+    today = jdatetime.date.today()
+    return today.strftime("%Y/%m/%d") 
+
+def check_date(user_date):
+
+    today = jdatetime.date.today()
+    try:
+        year, month, day = map(int, user_date.split('/'))
+        user_date_obj = jdatetime.date(year, month, day)
+    except ValueError:
+        return "فرمت تاریخ ارسالی صحیح نیست. لطفاً از فرمت YYYY/MM/DD استفاده کنید."
+
+    days_difference = (user_date_obj - today).days
+
+    if days_difference == 0:
+        return True
+    else:
+        return False
+    
+def calculate_discount_percentage(original_price, discounted_price):
+    try:
+        # اطمینان از اینکه مقادیر عددی و مثبت هستند
+        if original_price <= 0 or discounted_price < 0:
+            return "قیمت‌ها باید عددی مثبت باشند."
+        if discounted_price > original_price:
+            return "قیمت تخفیف‌یافته نمی‌تواند از قیمت اصلی بیشتر باشد."
+        
+        # محاسبه درصد تخفیف
+        discount = ((original_price - discounted_price) / original_price) * 100
+        return round(discount, 2)  # گرد کردن به دو رقم اعشار
+    except Exception as e:
+        return f"خطایی رخ داده است: {e}"
 
 # -------------------------------  start -------------------------------
 
@@ -156,6 +199,7 @@ async def move_file(src_file, dest_folder):
 async def process(event):
     try:
         user_id = event.sender_id
+        
         if user_id not in user_step:
             return
 
@@ -929,32 +973,52 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                     event,
                     action=f"خطا در فرآیند رفع مسدودیت کاربر با شناسه {user_i}: {str(e)}"
                 ) 
-        #TODO 
+
+        if current_step == "del_discount":
+            try:
+                del_discount = event.text
+                user_cach[user_id]["del_discount"] = del_discount
+                del_discount = user_cach[user_id]["del_discount"]
+                async with client.action(event.chat_id, 'typing'):
+                    await asyncio.sleep(0.3)
+                    inus = await db.read_discount(del_discount)
+                    if inus:
+                        await db.delete_discount(del_discount)
+                        await client.send_message(user_id,ConstText.del_discount,buttons=keys.key_discouny(),parse_mode="HTML")
+                        user_cach.pop(user_id)
+                        user_step.pop(user_id)
+                    else:
+                        await event.reply("مقدار ورودی اشتباه است ❗️")
+            except Exception as e:
+                await log_to_channel(event, action=f"خطا در پردازش مرحله: {e}")
+                
         if current_step == "discount":
             try:
                 discount = event.text
                 if discount.isdigit():
                     user_cach[user_id]["discount"] = discount
-                    user_step[user_id] = "dateexpire"
                     async with client.action(event.chat_id, 'typing'):
                         await asyncio.sleep(0.3)
-                        await client.send_message(user_id,ConstText.d,parse_mode="HTML")
+                        toda = get_persian_date()
+                        await client.send_message(user_id,ConstText.d.format(toda),parse_mode="HTML")
+                    user_step[user_id] = "dateexpire"
                 else:
-                    pass
+                    await event.reply("مقدار ورودی اشتباه است لطفا عدد به عنوان مقدار وارد کنید ❗️")
             except Exception as e:
                 await log_to_channel(event, action=f"خطا در پردازش مرحله: {e}")
             
         if current_step == "dateexpire":
             try:
                 dateexpire = event.text
-                if dateexpire.isdigit():
+                if dateexpire:
                     user_cach[user_id]["dateexpire"] = dateexpire
-                    user_step[user_id] = "countallow"
                     async with client.action(event.chat_id, 'typing'):
                         await asyncio.sleep(0.3)
                         await event.reply("تعداد استفاده کد تخفیف را وارد کنید 🙏🏻")
+                    user_step[user_id] = "countallow"
                 else:
-                    pass
+                    await event.reply("مقدار ورودی اشتباه است لطفا به مقدار دهی تاریخ خود توجه کنید ❗️")
+                    
             except Exception as e:
                 await log_to_channel(event, action=f"خطا در پردازش مرحله: {e}")
         
@@ -963,16 +1027,22 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                 countallow = event.text
                 if countallow.isdigit():
                     user_cach[user_id]["countallow"] = countallow
-                    user_step[user_id] = "countallow"
                     async with client.action(event.chat_id, 'typing'):
                         await asyncio.sleep(0.3)
-                        # TODO def create cod and create database 
-                        await client.send_message(user_id,ConstText.n,parse_mode="HTML")
+                        code = generate_discount_code()
+                        discount = user_cach[user_id]["discount"]
+                        dateexpire = user_cach[user_id]["dateexpire"] 
+                        await db.create_discount(code,dateexpire,countallow,countallow,discount)
+                        await client.send_message(user_id,ConstText.discount.format(code,dateexpire,discount,countallow),parse_mode="HTML")
+                        user_cach.pop(user_id)
+                        user_step.pop(user_id)
+                        
                 else:
-                    pass
+                    await event.reply("مقدار ورودی اشتباه است لطفا عدد به عنوان مقدار وارد کنید ❗️")
+
             except Exception as e:
                 await log_to_channel(event, action=f"خطا در پردازش مرحله: {e}")
-        #TODO   
+
         step = user_step[user_id]
         
         message_text = event.text  
@@ -1804,7 +1874,6 @@ async def send_message_channel(event: events.NewMessage.Event):
             event,
             action=f"خطا در پردازش درخواست ارسال پیام همگانی برای کاربر {user_id}: {str(e)}"
         )
-        print(f"Error: {e}")
         await event.respond("خطا در پردازش درخواست شما پیش آمد. لطفاً دوباره تلاش کنید.")
 
 @client.on(events.NewMessage(pattern="حذف حساب کاربر 🗑"))
@@ -2401,7 +2470,39 @@ async def show_ref_bot_handler(event):
     # ثبت لاگ برای تغییر صفحه و نمایش ربات‌ها
     await log_to_channel(event, action=f"ادمین {event.sender_id} صفحه {page} ربات‌ها را مشاهده کرد.")
 
-@client.on(events.NewMessage(pattern="کد تخفیف 🈹"))
+@client.on(events.NewMessage(pattern="کد تخفیف 🏷"))
+async def start_create_referrabot(event):
+    global user_step, user_cach
+    user_id = event.sender_id
+    await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
+    if user_id in user_step:
+        user_step.pop(user_id)
+        user_cach.pop(user_id)
+        return
+    try:
+        # بررسی اینکه آیا کاربر ادمین است
+        AnyAdmin = await db.ReadAdmin(user_id)
+        if AnyAdmin:
+                keyboard = keys.key_discouny()
+                async with client.action(event.chat_id, 'typing'):
+                    await asyncio.sleep(0.3)
+                    await event.reply("پنل مدیریت تخفیفات 🏷", buttons=keyboard)
+        else:
+            await event.respond(ConstText.noacsess)
+            
+            await log_to_channel(
+                event,
+                action=f"کاربر {user_id} سعی کرده به بخش ارسال پیام همگانی دسترسی پیدا کند اما ادمین نبوده است."
+            )
+    
+    except Exception as e:
+        await log_to_channel(
+            event,
+            action=f"خطا در پردازش درخواست ارسال پیام همگانی برای کاربر {user_id}: {str(e)}"
+        )
+        await event.respond("خطا در پردازش درخواست شما پیش آمد. لطفاً دوباره تلاش کنید.")
+            
+@client.on(events.NewMessage(pattern="ثبت تخفیف 🟢"))
 async def start_create_referrabot(event):
     user_id = event.sender_id
     global user_step, user_cach
@@ -2411,45 +2512,70 @@ async def start_create_referrabot(event):
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
-        # بررسی اینکه کاربر ادمین است یا خیر
         admin = await db.ReadAdmin(user_id)
         if admin:
-            # اگر کاربر قبلاً در حال ایجاد کلید باشد، از وضعیت خارج می‌شود
-            
-            # شروع فرآیند ساخت کلید جدید
             user_step[user_id] = "discount"
             user_cach[user_id] = {}
-            
-            # ارسال درخواست برای وارد کردن نام ربات
-            keyboard = keys.Back_menu()
+            keyboard = keys.cancel()
             async with client.action(event.chat_id, 'typing'):
                 await asyncio.sleep(0.3)
                 await event.reply("لطفاً درصد تخفیف را وارد کنید 🙏🏻", buttons=keyboard)
-            
-            # ثبت لاگ برای آغاز ساخت کلید
             await log_to_channel(
                 event,
                 action=f"ادمین {user_id} فرآیند ساخت کلید جدید را آغاز کرده است."
             )
         else:
-            # اگر کاربر ادمین نباشد، پیام عدم دسترسی ارسال می‌شود
             await event.respond("شما دسترسی لازم برای انجام این عمل را ندارید.")
-            
-            # ثبت لاگ برای تلاش کاربر بدون دسترسی
             await log_to_channel(
                 event,
                 action=f"کاربر {user_id} بدون دسترسی سعی کرده فرآیند ساخت کلید را آغاز کند."
             )
 
     except Exception as e:
-        # ثبت لاگ خطا در صورت بروز مشکل
         await log_to_channel(
             event,
             action=f"خطا در پردازش درخواست ساخت کلید برای کاربر {user_id}: {str(e)}"
         )
         print(f"Error: {e}")
         await event.respond("خطا در پردازش درخواست شما پیش آمد. لطفاً دوباره تلاش کنید.")
-    
+ 
+@client.on(events.NewMessage(pattern="حذف تخفیف 🗑"))
+async def start_create_referrabot(event):
+    user_id = event.sender_id
+    global user_step, user_cach
+    if user_id in user_step:
+        user_step.pop(user_id)
+        user_cach.pop(user_id)
+        return
+    await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
+    try:
+        admin = await db.ReadAdmin(user_id)
+        if admin:
+            user_step[user_id] = "del_discount"
+            user_cach[user_id] = {}
+            keyboard = keys.cancel()
+            async with client.action(event.chat_id, 'typing'):
+                await asyncio.sleep(0.3)
+                await event.reply("لطفاً برای حذف ٫ کد تخفیف را وارد کنید 🙏🏻", buttons=keyboard)
+            await log_to_channel(
+                event,
+                action=f"ادمین {user_id} فرآیند حذف را آغاز کرده است."
+            )
+        else:
+            await event.respond("شما دسترسی لازم برای انجام این عمل را ندارید.")
+            await log_to_channel(
+                event,
+                action=f"کاربر {user_id} بدون دسترسی سعی کرده فرآیند ساخت کلید را آغاز کند."
+            )
+
+    except Exception as e:
+        await log_to_channel(
+            event,
+            action=f"خطا در پردازش درخواست ساخت کلید برای کاربر {user_id}: {str(e)}"
+        )
+        print(f"Error: {e}")
+        await event.respond("خطا در پردازش درخواست شما پیش آمد. لطفاً دوباره تلاش کنید.")
+           
 # -------------------------------  callback -------------------------------
             
 user_cach = {}
@@ -2515,11 +2641,24 @@ async def callback_handler(event):
             pass
     
     order_step = user_step.get(user_id)
-    
+# TODO
     if "read_balance_" in order_step:
         name = order_step.replace("read_balance_", "")
         
-        if "plus_" in data:
+        if "discount_" in data:
+            discount_ = await db.read_discounts()
+            balanc = await db.read_balance_referrabotbyname(name)
+            balanc = int(float(balanc[0]))
+            
+            toda = get_persian_date()
+            if discount_:
+                for discount in discount_:
+                    if discount[2] != toda:
+                        di = discount[5]
+                        dis = calculate_discount_percentage(balanc,di)
+                        
+                        
+        elif "plus_" in data:
             i = int(data.replace("plus_", ""))
             balanc = await db.read_balance_referrabotbyname(name)
             i = i + 1
@@ -2567,6 +2706,7 @@ async def callback_handler(event):
             # ثبت لاگ برای تنظیم مقدار با عملیات خاص
             await log_to_channel(event, action=f"کاربر {user_id} مقدار {i} را برای ربات {name} تنظیم کرد.")
 
+                        
         elif "accept_order" in data:
             balanc = await db.read_balance_referrabotbyname(name)
             balanc = int(float(balanc[0]))
@@ -2578,6 +2718,9 @@ async def callback_handler(event):
                 await event.edit("💰 اعتبار شما کافی نیست بعد از شارژ اعتبار دوباره اقدام کنید")
                 user_step.pop(user_id)
                 user_cach.pop(user_id)
+    
+                        
+                    
 
 # -------------------------------  run -------------------------------
 

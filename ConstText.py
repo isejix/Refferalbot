@@ -73,6 +73,17 @@ n = """<blockquote>🆔 @ یا https://t.me/urusername وارد کنید</blockq
 لطفاً یوزرنیم ربات را وارد کنید 🙏🏻
 """
 
-d = f"""<blockquote>تاریح امروز {0}</blockquote>
+d = """<blockquote>تاریح امروز {0}</blockquote>
 تاریخ انقضا را وارد کنید 🙏🏻
+"""
+
+discount = """<blockquote>ثبت کد تخفیف 🏷</blockquote>
+🗝 کد تخفیف : {0}\n
+📆 تاریح انقضا : {1}\n
+📝 درصد تخفیف : {2}\n
+📌 تعداد : {3}
+"""
+
+del_discount = """<blockquote>حذف کد تخفیف 🏷</blockquote>
+کد تخفیف با موفقیت حذف شد ✅
 """

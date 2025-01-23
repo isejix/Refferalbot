@@ -58,8 +58,8 @@ async def create_database():
         await db.execute("""
             CREATE TABLE IF NOT EXISTS discount (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                code BIGINT ,
-                dateexpire DATETIME,
+                code varchar ,
+                dateexpire varchar,
                 countallow INT,
                 countuse INT,
                 percentdis FLOAT
@@ -335,15 +335,15 @@ async def read_account(date):
             
 # ------------------------------- CRUD for 'dicount' Table -------------------------------
 
-async def create_discount(code, dateexpire, countallow, percentdis):
+async def create_discount(code: str, dateexpire:str, countallow:int,countuse:int, percentdis:float):
     """ایجاد کد تخفیف جدید."""
     async with aiosqlite.connect("database.db") as db:
         await db.execute(
             """
             INSERT INTO discount (code, dateexpire, countallow, countuse, percentdis)
-            VALUES (?, ?, ?, 0, ?);
+            VALUES (?, ?, ?, ?, ?);
             """,
-            (code, dateexpire, countallow, percentdis),
+            (code, dateexpire, countallow,countuse, percentdis),
         )
         await db.commit()
 
@@ -353,7 +353,7 @@ async def read_discounts():
         async with db.execute("SELECT * FROM discount;") as cursor:
             return await cursor.fetchall()
 
-async def get_discount(code):
+async def read_discount(code):
     """دریافت اطلاعات کد تخفیف بر اساس `code`."""
     async with aiosqlite.connect("database.db") as db:
         async with db.execute("SELECT * FROM discount WHERE code = ?;", (code,)) as cursor:
