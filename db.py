@@ -196,7 +196,7 @@ async def ReadWalletUser(UserId):
         Cursor = await conn.execute("""
             SELECT walletus FROM user
             WHERE UserId = ?
-            """, (str(UserId),))
+            """, (UserId,))
         result =  await Cursor.fetchall()
         if result:
                 return result[0]

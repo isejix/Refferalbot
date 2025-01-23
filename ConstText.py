@@ -64,3 +64,15 @@ order = """
 join_channel = """<blockquote>🎟 کانال ما</blockquote>
 ⚠️ لطفا برای استفاده از خدمات ربات اول جوین چنل بشید
 """
+
+x = """<blockquote>🆔 @ یا https://t.me/urusername وارد کنید</blockquote>
+لطفاً یوزنیم را درست وارد کنید 🙏🏻
+"""
+
+n = """<blockquote>🆔 @ یا https://t.me/urusername وارد کنید</blockquote>
+لطفاً یوزرنیم ربات را وارد کنید 🙏🏻
+"""
+
+d = f"""<blockquote>تاریح امروز {0}</blockquote>
+تاریخ انقضا را وارد کنید 🙏🏻
+"""

@@ -19,7 +19,7 @@ def key_start_sudo():
         
         [Button.text("مدیریت ربات ها📍",resize=True), Button.text("آپلود سشن 📤",resize=True)],
         [Button.text("پیام همگانی ✉️",resize=True), Button.text("حساب کاربر 👤",resize=True)],
-        [Button.text("مشتریان و گزارشات 📎",resize=True)]
+        [Button.text("مشتریان و گزارشات 📎",resize=True),Button.text("کد تخفیف 🈹",resize=True)]
     ]
     
     return keyboard
@@ -102,11 +102,11 @@ def key_read_button_refferalbot(referalls, page=1, page_size=30):
          
                 ])
     
-    for i in current_page_data:
+    for i in range(1,len(current_page_data)):
         key.append([
-            Button.inline(f"✅ {i[0]})", data=f"counter_{i[0]}"),
-            Button.url(f"{i[1]}", url=f"{i[2]}"),
-            Button.inline(f"{i[3]}", data=f"price_{int(float(i[0]))}"),
+            Button.inline(f"✅ {i})", data=f"counter"),
+            Button.url(f"{current_page_data[i][1]}", url=f"{current_page_data[i][2]}"),
+            Button.inline(f"{current_page_data[i][3]}", data=f"price_{int(float(current_page_data[i][0]))}"),
         ])
 
     navigation_buttons = []
