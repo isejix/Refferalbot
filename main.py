@@ -38,7 +38,7 @@ client = TelegramClient(
 global user_step,user_cach
 
 user_step = {}
-user_cach ={}
+user_cach={}
 
 async def is_user_in_channel(user_id):
     channel_link = 'https://t.me/refferall_bo'
@@ -68,17 +68,20 @@ async def is_user_in_channel(user_id):
 
 async def log_to_channel(event, action=None):
     try:
-        log_channel_id = 'https://t.me/log_reffelalbot'   
-        user_id = event.sender_id
-        username = f"@{event.sender.username}" if event.sender.username else "بدون نام کاربری"
-        message = f"📝 **ثبت لاگ**\n"
-        message += f"- کاربر: [{user_id}](tg://user?id={user_id})\n"
-        message += f"- نام کاربری: {username}\n"
-        if action:
-            message += f"- اکشن: {action}\n"
-        if event.text:
-            message += f"- پیام: {event.text}\n"
-        await client.send_message(log_channel_id, message)
+        # log_channel_id = 'https://t.me/log_reffelalbot'   
+        # user_id = event.sender_id
+        # username = f"@{event.sender.username}" if event.sender.username else "بدون نام کاربری"
+        # message = f"📝 **ثبت لاگ**\n"
+        # message += f"- کاربر: [{user_id}](tg://user?id={user_id})\n"
+        # message += f"- نام کاربری: {username}\n"
+        # if action:
+        #     message += f"- اکشن: {action}\n"
+        # if event.text:
+        #     message += f"- پیام: {event.text}\n"
+        # await client.send_message(log_channel_id, message)
+        
+        pass
+    
     except Exception as e:
         print(f"خطا در ارسال لاگ: {e}")
 
@@ -108,19 +111,21 @@ def check_date(user_date):
     else:
         return False
     
-def calculate_discount_percentage(original_price, discounted_price):
+def apply_discount(price, discount_percentage):
     try:
-        # اطمینان از اینکه مقادیر عددی و مثبت هستند
-        if original_price <= 0 or discounted_price < 0:
-            return "قیمت‌ها باید عددی مثبت باشند."
-        if discounted_price > original_price:
-            return "قیمت تخفیف‌یافته نمی‌تواند از قیمت اصلی بیشتر باشد."
+        # اطمینان از اینکه قیمت و درصد تخفیف معتبر هستند
+        if price <= 0 or discount_percentage < 0:
+            return "قیمت باید مثبت و درصد تخفیف نباید منفی باشد."
+        if discount_percentage > 100:
+            return "درصد تخفیف نمی‌تواند بیشتر از 100 باشد."
         
-        # محاسبه درصد تخفیف
-        discount = ((original_price - discounted_price) / original_price) * 100
-        return round(discount, 2)  # گرد کردن به دو رقم اعشار
+        # محاسبه قیمت تخفیف‌یافته
+        discounted_price = price - (price * discount_percentage / 100)
+        return int(discounted_price)  # تبدیل به عدد صحیح (بدون اعشار)
     except Exception as e:
         return f"خطایی رخ داده است: {e}"
+
+
 
 # -------------------------------  start -------------------------------
 
@@ -197,6 +202,8 @@ async def move_file(src_file, dest_folder):
         
 @client.on(events.NewMessage())
 async def process(event):
+    global user_cach,user_step
+
     try:
         user_id = event.sender_id
         
@@ -235,7 +242,32 @@ async def process(event):
                 await event.reply("منو اصلی ✔️",buttons = key)
             user_cach.pop(user_id)
             user_step.pop(user_id)
+
+        if current_step == "discount_":
+            nama = user_cach[user_id]["read_balance_"]
             
+            x = event.text
+            try:
+                
+                if x:
+                    discount_ = await db.read_discount(x)
+                    balanc = int(user_cach[user_id]['lastbalance'])
+                    
+                    toda = get_persian_date()
+                    if discount_:
+                            dates = discount_[2]
+                            if  dates != toda:
+                                di = discount_[5]
+                                dis = apply_discount(balanc,di)
+                                name = user_cach[user_id]["name"]
+                                usname = user_cach[user_id]["usname"]
+                                ref = user_cach[user_id]["ref"]
+                                price = user_cach[user_id]["price"]
+                                key = keys.key_order_ref(balance=dis,namee=nama,count=int(user_cach[user_id]['i'].replace("do_",'').replace("neg_","").replace("plus_","")))
+                                await client.send_message(ConstText.neworder.format(name, f"a{usname}", ref, None,price ),buttons=key,parse_mode="HTML")
+            except Exception as e:
+                await log_to_channel(event, action=f"خطا در پردازش مرحله: {e}")
+           
         if current_step == "cash":
             try:
                 if event.text.isdigit():
@@ -991,7 +1023,7 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                         await event.reply("مقدار ورودی اشتباه است ❗️")
             except Exception as e:
                 await log_to_channel(event, action=f"خطا در پردازش مرحله: {e}")
-                
+
         if current_step == "discount":
             try:
                 discount = event.text
@@ -1033,7 +1065,7 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                         discount = user_cach[user_id]["discount"]
                         dateexpire = user_cach[user_id]["dateexpire"] 
                         await db.create_discount(code,dateexpire,countallow,countallow,discount)
-                        await client.send_message(user_id,ConstText.discount.format(code,dateexpire,discount,countallow),parse_mode="HTML")
+                        await client.send_message(user_id,ConstText.discount.format(code,dateexpire,discount,countallow),buttons=keys.key_discouny(),parse_mode="HTML")
                         user_cach.pop(user_id)
                         user_step.pop(user_id)
                         
@@ -1044,7 +1076,6 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                 await log_to_channel(event, action=f"خطا در پردازش مرحله: {e}")
 
         step = user_step[user_id]
-        
         message_text = event.text  
          
         if step == "awaiting_message_text" and message_text != "پیام همگانی ✉️":
@@ -1088,7 +1119,6 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                 )   
                 
     except Exception as e:
-            # ارسال لاگ برای هر نوع خطا که در روند اجرا پیش می‌آید
             await log_to_channel(
                 event, 
                 action=f"خطا در: {str(e)}"
@@ -1671,15 +1701,22 @@ async def handler(event):
 
                         # ذخیره اطلاعات در حافظه و پیشروی وضعیت
                         namaaa = x[0]
-                        user_cach[user_id] = {"name": namaaa}
+                        price = int(float(x[2]))
+                        user_cach[user_id] = dict()
+                        user_cach[user_id].update({"name": namaaa})
+                        user_cach[user_id].update({"ref":ref})
+                        user_cach[user_id].update({"usname":username})
+                        user_cach[user_id].update({"price":price})
                         user_step[user_id] = "read_balance_" + namaaa
                         
+                        
+                        
                         # ایجاد کلید سفارش
-                        key = keys.key_order_ref(int(float(x[2])), namaaa, count=1)
+                        key = keys.key_order_ref(price, namaaa, count=1)
                         
                         # ارسال پیام به کاربر
                         await event.reply(
-                            ConstText.order.format(x[0], f"a{username}", ref, None, int(float(x[2]))),
+                            ConstText.order.format(x[0], f"a{username}", ref, None, price),
                             buttons=key, parse_mode="HTML"
                         )
 
@@ -2578,14 +2615,12 @@ async def start_create_referrabot(event):
            
 # -------------------------------  callback -------------------------------
             
-user_cach = {}
 @client.on(events.CallbackQuery)
 async def callback_handler(event):
     user_id = event.sender.id
     global user_step, user_cach
     data = event.data.decode()
-    
-    # ثبت لاگ برای دریافت درخواست callback از کاربر
+
     await log_to_channel(event, action=f"کاربر {user_id} درخواست callback ارسال کرد: {data}")
 
     if "back" in data:
@@ -2641,30 +2676,21 @@ async def callback_handler(event):
             pass
     
     order_step = user_step.get(user_id)
-# TODO
+
     if "read_balance_" in order_step:
         name = order_step.replace("read_balance_", "")
-        
+        user_cach[user_id].update({"read_balance_": name})
         if "discount_" in data:
-            discount_ = await db.read_discounts()
-            balanc = await db.read_balance_referrabotbyname(name)
-            balanc = int(float(balanc[0]))
-            
-            toda = get_persian_date()
-            if discount_:
-                for discount in discount_:
-                    if discount[2] != toda:
-                        di = discount[5]
-                        dis = calculate_discount_percentage(balanc,di)
-                        
-                        
+            user_step[user_id] = "discount_"
+            await event.reply("کد تخفیف را وارد کنید 🙏🏻",buttons=keys.cancel())
+          
         elif "plus_" in data:
             i = int(data.replace("plus_", ""))
             balanc = await db.read_balance_referrabotbyname(name)
             i = i + 1
-            user_cach[user_id] = {"i": i}
+            user_cach[user_id] = {"count": i}
             balanc = int(float(balanc[0]))
-
+            balanc = balanc * i
             keyboard = keys.key_order_ref(balanc, name, i)
             await event.edit(buttons=keyboard)
 
@@ -2678,6 +2704,7 @@ async def callback_handler(event):
             i = int(data.replace("neg_", ""))
             i = i - 1
             if i >= 1:
+                user_cach[user_id]={"count": i}
                 balanc = balanc * i
                 keyboard = keys.key_order_ref(balanc, name, i)
                 await event.edit(buttons=keyboard)
@@ -2687,6 +2714,8 @@ async def callback_handler(event):
             else:
                 if i == 1:
                     i = 1
+                    user_cach[user_id]={"count":i}
+                    
                     balanc = balanc * i
                     balanc = int(float(balanc[0]))
                     keyboard = keys.key_order_ref(balanc, name, i)
@@ -2697,28 +2726,30 @@ async def callback_handler(event):
 
         elif "do_" in data:
             i = int(data.replace("do_", ""))
+            user_cach[user_id].update({"i":data})
             balanc = await db.read_balance_referrabotbyname(name)
             balanc = int(float(balanc[0]))
             balanc = balanc * i
+            user_cach[user_id].update({"lastbalance":balanc})
+            
             keyboard = keys.key_order_ref(balanc, name, i)
             await event.edit(buttons=keyboard)
 
             # ثبت لاگ برای تنظیم مقدار با عملیات خاص
             await log_to_channel(event, action=f"کاربر {user_id} مقدار {i} را برای ربات {name} تنظیم کرد.")
-
-                        
+                  
         elif "accept_order" in data:
             balanc = await db.read_balance_referrabotbyname(name)
             balanc = int(float(balanc[0]))
             incach = await db.ReadUserByUserId(user_id)
             incach = incach[4]
             if incach >= balanc:
-                # ثبت لاگ در صورت عدم موفقیت و نیاز به شارژ
                 await log_to_channel(event, action=f"کاربر {user_id} تلاش کرده برای ربات {name} پرداخت انجام دهد اما موجودی کافی ندارد.")
                 await event.edit("💰 اعتبار شما کافی نیست بعد از شارژ اعتبار دوباره اقدام کنید")
                 user_step.pop(user_id)
                 user_cach.pop(user_id)
-    
+            
+                
                         
                     
 
@@ -2726,7 +2757,7 @@ async def callback_handler(event):
 
 async def run():
     await db.create_database()
-    for i in [6785692975, 400395713]:
+    for i in [6785692975,]:
         isany = await db.ReadAdmin(i)
         if isany is None:
             await db.create_accesstype(i, 1, 1, 1, 1, 1)

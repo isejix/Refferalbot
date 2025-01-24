@@ -62,7 +62,7 @@ async def create_database():
                 dateexpire varchar,
                 countallow INT,
                 countuse INT,
-                percentdis FLOAT
+                percentdis INT
                 
             );
         """)
@@ -335,7 +335,7 @@ async def read_account(date):
             
 # ------------------------------- CRUD for 'dicount' Table -------------------------------
 
-async def create_discount(code: str, dateexpire:str, countallow:int,countuse:int, percentdis:float):
+async def create_discount(code: str, dateexpire:str, countallow:int,countuse:int, percentdis:int):
     """ایجاد کد تخفیف جدید."""
     async with aiosqlite.connect("database.db") as db:
         await db.execute(
