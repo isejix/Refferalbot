@@ -43,7 +43,6 @@ async def check_status_sessions(session):
 
 async def acc_start_ref(session,username,keyrefral):
     client = TelegramClient(session, api_id, api_hash)
-    
     await client.connect()
     if not await client.is_user_authorized():
         print("Client is not authorized. Please log in.")
@@ -58,10 +57,12 @@ async def acc_start_ref(session,username,keyrefral):
     try:
         request = StartBotRequest(bot=peer.peer, peer=peer.peer, start_param=keyrefral)
         result = await client(request)
-        print("Bot started successfully:", result)
+        if result:
+            return True
+        else:
+            return False
     except Exception as e:
         print(f"Error starting bot: {e}")
     
     await client.disconnect()
     return True
-

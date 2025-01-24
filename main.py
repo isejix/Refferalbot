@@ -68,17 +68,17 @@ async def is_user_in_channel(user_id):
 
 async def log_to_channel(event, action=None):
     try:
-        # log_channel_id = 'https://t.me/log_reffelalbot'   
-        # user_id = event.sender_id
-        # username = f"@{event.sender.username}" if event.sender.username else "بدون نام کاربری"
-        # message = f"📝 **ثبت لاگ**\n"
-        # message += f"- کاربر: [{user_id}](tg://user?id={user_id})\n"
-        # message += f"- نام کاربری: {username}\n"
-        # if action:
-        #     message += f"- اکشن: {action}\n"
-        # if event.text:
-        #     message += f"- پیام: {event.text}\n"
-        # await client.send_message(log_channel_id, message)
+        log_channel_id = 'https://t.me/log_reffelalbot'   
+        user_id = event.sender_id
+        username = f"@{event.sender.username}" if event.sender.username else "بدون نام کاربری"
+        message = f"📝 **ثبت لاگ**\n"
+        message += f"- کاربر: [{user_id}](tg://user?id={user_id})\n"
+        message += f"- نام کاربری: {username}\n"
+        if action:
+            message += f"- اکشن: {action}\n"
+        if event.text:
+            message += f"- پیام: {event.text}\n"
+        await client.send_message(log_channel_id, message)
         
         pass
     
@@ -264,7 +264,10 @@ async def process(event):
                                 ref = user_cach[user_id]["ref"]
                                 price = user_cach[user_id]["price"]
                                 key = keys.key_order_ref(balance=dis,namee=nama,count=int(user_cach[user_id]['i'].replace("do_",'').replace("neg_","").replace("plus_","")))
-                                await client.send_message(ConstText.neworder.format(name, f"a{usname}", ref, None,price ),buttons=key,parse_mode="HTML")
+                                await client.send_message(user_id,ConstText.neworder.format(name, usname, ref, None,price ),buttons=key,parse_mode="HTML")
+                                user_cach.pop(user_id)
+                                user_step.pop(user_id)
+                                user_cach[user_id] = {"discount_balance":dis}
             except Exception as e:
                 await log_to_channel(event, action=f"خطا در پردازش مرحله: {e}")
            
@@ -697,15 +700,15 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                                     continue
 
                             if i > 0:
-                                folder_path = "./session"
-                                if os.path.exists(folder_path):
-                                    files = os.listdir(folder_path)
+                                dest_folder = "./session"
+                                if os.path.exists(dest_folder):
+                                    files = os.listdir(dest_folder)
                                     if files:
                                         healthy_count = 0 
                                         broken_count = 0  
 
                                         for file in files:
-                                            file_path = os.path.join(folder_path, file) 
+                                            file_path = os.path.join(dest_folder, file) 
                                             check_stat = await account.check_status_sessions(file_path) 
 
                                             if check_stat: 
@@ -717,7 +720,6 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                                                 try:
                                                     await db.create_account(int(phone_number), to_day)
                                                 except sqlite3.OperationalError as e:
-                                                    print(f"Database error: {e}")
                                                     await log_to_channel(event, action=f"خطای پایگاه داده هنگام ثبت حساب برای {phone_number}: {e}")
                                                     async with client.action(event.chat_id, 'typing'):
                                                         await asyncio.sleep(0.3)
@@ -732,6 +734,7 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                                             await event.reply(
                                                 f"تعداد {healthy_count} سشن سالم به اکانت‌ها اضافه شد ⭐️\n"
                                                 f"تعداد {broken_count} سشن خراب است."
+                                                ,buttons = keys.key_start_sudo()
                                             )
                                             user_cach.pop(user_id)
                                             user_step.pop(user_id)
@@ -1028,12 +1031,18 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
             try:
                 discount = event.text
                 if discount.isdigit():
-                    user_cach[user_id]["discount"] = discount
-                    async with client.action(event.chat_id, 'typing'):
-                        await asyncio.sleep(0.3)
-                        toda = get_persian_date()
-                        await client.send_message(user_id,ConstText.d.format(toda),parse_mode="HTML")
-                    user_step[user_id] = "dateexpire"
+                    if int(discount) < 5:
+                        await event.reply("Discount percent must be bigger than 5 percent")
+                    elif int(discount) > 90:
+                        await event.reply("Discount percent must be less than 90 percent")
+
+                    else:
+                        user_cach[user_id]["discount"] = discount
+                        async with client.action(event.chat_id, 'typing'):
+                            await asyncio.sleep(0.3)
+                            toda = get_persian_date()
+                            await client.send_message(user_id,ConstText.d.format(toda),parse_mode="HTML")
+                        user_step[user_id] = "dateexpire"
                 else:
                     await event.reply("مقدار ورودی اشتباه است لطفا عدد به عنوان مقدار وارد کنید ❗️")
             except Exception as e:
@@ -1671,9 +1680,9 @@ async def backmeno(event):
     user_cach.pop(user_id)
     user_step.pop(user_id)
     
-PATTERN = r'https://t\.me/([a-zA-Z0-9_-]+)/app\?startapp=(ref_[\w\d]+)'
+pattern = r'https://t\.me/([\w\d_]+)/[\w\d_]+\?startapp=([\w\d=%_]+)'
 
-@client.on(events.NewMessage(pattern=PATTERN))
+@client.on(events.NewMessage(pattern=pattern))
 async def handler(event):
     global user_step,user_cach
     user_id = event.sender.id
@@ -1687,7 +1696,7 @@ async def handler(event):
         user = await db.ReadUserByUserId(user_id)
         
         # تطبیق الگو با پیام
-        match = re.search(r'https://t\.me/([\w\d_]+)/app\?startapp=(ref_[\w\d]+)', message)
+        match = re.search(r'(https://t\.me/[\w\d_]+)/[\w\d_]+\?startapp=([\w\d=%_]+)', message)
         
         if user:
             if match:
@@ -1716,7 +1725,7 @@ async def handler(event):
                         
                         # ارسال پیام به کاربر
                         await event.reply(
-                            ConstText.order.format(x[0], f"a{username}", ref, None, price),
+                            ConstText.order.format(x[0], username, ref, None, price),
                             buttons=key, parse_mode="HTML"
                         )
 
@@ -2691,6 +2700,8 @@ async def callback_handler(event):
             user_cach[user_id] = {"count": i}
             balanc = int(float(balanc[0]))
             balanc = balanc * i
+            user_cach[user_id] ={"lastbalance":balanc}
+
             keyboard = keys.key_order_ref(balanc, name, i)
             await event.edit(buttons=keyboard)
 
@@ -2706,6 +2717,7 @@ async def callback_handler(event):
             if i >= 1:
                 user_cach[user_id]={"count": i}
                 balanc = balanc * i
+                user_cach[user_id] ={"lastbalance":balanc}
                 keyboard = keys.key_order_ref(balanc, name, i)
                 await event.edit(buttons=keyboard)
 
@@ -2717,6 +2729,8 @@ async def callback_handler(event):
                     user_cach[user_id]={"count":i}
                     
                     balanc = balanc * i
+                    user_cach[user_id] ={"lastbalance":balanc}
+
                     balanc = int(float(balanc[0]))
                     keyboard = keys.key_order_ref(balanc, name, i)
                     await event.edit(buttons=keyboard)
@@ -2740,14 +2754,34 @@ async def callback_handler(event):
                   
         elif "accept_order" in data:
             balanc = await db.read_balance_referrabotbyname(name)
-            balanc = int(float(balanc[0]))
-            incach = await db.ReadUserByUserId(user_id)
-            incach = incach[4]
-            if incach >= balanc:
+            # balanc2 = user_cach[user_id]["discount_balance"]
+            balanc1 = user_cach[user_id]["lastbalance"]
+            incach = await db.ReadWalletUser(user_id)
+            # incach = incach[4]
+            if incach[0] <= balanc1 :
                 await log_to_channel(event, action=f"کاربر {user_id} تلاش کرده برای ربات {name} پرداخت انجام دهد اما موجودی کافی ندارد.")
                 await event.edit("💰 اعتبار شما کافی نیست بعد از شارژ اعتبار دوباره اقدام کنید")
                 user_step.pop(user_id)
                 user_cach.pop(user_id)
+            else:
+                username =user_cach[user_id]["usname"].replace("https://t.me/","")
+                
+                ref = user_cach[user_id]["ref"]
+                file = "./session"
+                if os.path.exists(file):
+                    files = os.listdir(file)
+                # balance - order , if code discount i-- tabale, 
+                    for i in files:
+                    
+                        respons = await account.acc_start_ref(i,username,ref)
+                        
+                        if respons:
+                            balance = incach[0] - balanc1 
+                            await db.UpdateWalletUser(user_id,balance)
+                            await event.respond("hi")
+                        else:
+                            await event.respond("by")
+                    
             
                 
                         
@@ -2755,7 +2789,7 @@ async def callback_handler(event):
 
 # -------------------------------  run -------------------------------
 
-async def run():
+async def run(): 
     await db.create_database()
     for i in [6785692975,]:
         isany = await db.ReadAdmin(i)

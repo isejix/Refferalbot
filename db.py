@@ -39,21 +39,33 @@ async def create_database():
         """)
 
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS accounts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sessions BIGINT NOT NULL UNIQUE,
+                date DATETIME
+            );
+        """)
+
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS referrabots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                botname varchar,
-                username varchar,
+                botname VARCHAR NOT NULL,
+                username VARCHAR NOT NULL UNIQUE,
                 balance FLOAT NOT NULL
             );
         """)
 
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS accounts (
+            CREATE TABLE IF NOT EXISTS account_referral (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                sessions BIGINT NOT NULL,
-                date DATETIME
+                account_id INTEGER NOT NULL,
+                bot_id INTEGER NOT NULL,
+                FOREIGN KEY (account_id) REFERENCES accounts (id),
+                FOREIGN KEY (bot_id) REFERENCES referrabots (id),
+                UNIQUE (account_id, bot_id)
             );
         """)
+
         
         await db.execute("""
             CREATE TABLE IF NOT EXISTS discount (
@@ -291,7 +303,7 @@ async def read_referrabotbyname(botname : str):
     async with aiosqlite.connect("database.db") as conn:
         Cursor = await conn.execute("""
             SELECT botname , username , balance FROM referrabots
-            WHERE botname = ?
+            WHERE username = ?
             """, (str(botname),))
         return await Cursor.fetchone()
 
@@ -380,3 +392,34 @@ async def delete_expired_discounts(datee):
     async with aiosqlite.connect("database.db") as db:
         await db.execute("DELETE FROM discount WHERE dateexpire < ?;", (datee,))
         await db.commit()
+
+async def is_bot_already_started(db, session_id, bot_username):
+    query = """
+    SELECT 1
+    FROM account_referral
+    WHERE account_ = (SELECT id FROM accounts WHERE sessions = ?)
+      AND bot_id = (SELECT id FROM referrabots WHERE username = ?)
+    """
+    result = await db.fetch_one(query, (session_id, bot_username))
+    return result is not None
+
+async def add_start(db, session_id, bot_username):
+    # پیدا کردن یا اضافه کردن سشن
+    account_id = await db.execute("""
+        INSERT OR IGNORE INTO accounts (sessions) VALUES (?)
+    """, (session_id,))
+    account_id = account_id or await db.fetch_one("SELECT id FROM accounts WHERE sessions = ?", (session_id,))
+
+    # پیدا کردن یا اضافه کردن ربات
+    bot_id = await db.execute("""
+        INSERT OR IGNORE INTO referrabots (botname, username, balance) VALUES (?, ?, 0)
+    """, ("Bot Name", bot_username))
+    bot_id = bot_id or await db.fetch_one("SELECT id FROM referrabots WHERE username = ?", (bot_username,))
+
+    # اضافه کردن به جدول واسط
+    try:
+        await db.execute("""
+            INSERT INTO account_referral (account_id, bot_id) VALUES (?, ?)
+        """, (account_id, bot_id))
+    except Exception as e:
+        print("این سشن قبلاً این ربات را استارت کرده:", e)
