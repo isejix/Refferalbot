@@ -58,8 +58,8 @@ async def create_database():
         await db.execute("""
             CREATE TABLE IF NOT EXISTS account_referral (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                account_id INTEGER NOT NULL,
-                bot_id INTEGER NOT NULL,
+                account_id VARCHAR NOT NULL,
+                bot_id VARCHAR NOT NULL,
                 FOREIGN KEY (account_id) REFERENCES accounts (id),
                 FOREIGN KEY (bot_id) REFERENCES referrabots (id),
                 UNIQUE (account_id, bot_id)

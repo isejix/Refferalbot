@@ -14,18 +14,26 @@ proxyx = {
     'proxy_port': 2080  # Proxy server port
 }
 
-
 async def check_status_sessions(session):
     client = TelegramClient(session, api_id, api_hash)
+    
     try:
         await client.connect()
-        # چک کردن اینکه سشن معتبر است یا نه
+        
         if not await client.is_user_authorized():
             print(f"Session {session} is not authorized.")
+            await client.disconnect()
             return False
-        
+
         print(f"Session {session} is valid and authorized.")
-        return True
+
+        if await client.is_connected():
+            print("Client is still connected.")
+            return True
+        else:
+            print("Client got disconnected unexpectedly.")
+            return False
+
     except (AuthKeyError, FileNotFoundError):
         print(f"Session {session} is invalid or corrupted.")
         return False
@@ -35,11 +43,17 @@ async def check_status_sessions(session):
     except SessionPasswordNeededError:
         print(f"Session {session} requires two-factor authentication.")
         return False
+    except OSError:
+        print("Error occurred during disconnection.")
+    
     finally:
-        await client.disconnect()
-    
-    
+        if client.is_connected():
+            await client.disconnect()
+        
+        print("Client disconnected successfully.")
 
+    
+    
 
 async def acc_start_ref(session,username,keyrefral):
     client = TelegramClient(session, api_id, api_hash)

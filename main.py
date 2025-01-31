@@ -709,7 +709,7 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
 
                                         for file in files:
                                             file_path = os.path.join(dest_folder, file) 
-                                            check_stat = await account.check_status_sessions(file_path) 
+                                            check_stat = await account.check_status_sessions(file) 
 
                                             if check_stat: 
                                                 healthy_count += 1
@@ -770,6 +770,8 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                             os.remove(path)
                         if os.path.exists(folder_path):
                             shutil.rmtree(folder_path)
+                        user_cach.pop(user_id)
+                        user_step.pop(user_id)
 
                 else:
                     async with client.action(event.chat_id, 'typing'):
@@ -2754,7 +2756,7 @@ async def callback_handler(event):
                   
         elif "accept_order" in data:
             balanc = await db.read_balance_referrabotbyname(name)
-            # balanc2 = user_cach[user_id]["discount_balance"]
+            # balanc2 = user_cach[user_id]["discount_balance"] 
             balanc1 = user_cach[user_id]["lastbalance"]
             incach = await db.ReadWalletUser(user_id)
             # incach = incach[4]
@@ -2771,21 +2773,29 @@ async def callback_handler(event):
                 if os.path.exists(file):
                     files = os.listdir(file)
                 # balance - order , if code discount i-- tabale, 
-                    for i in files:
-                    
-                        respons = await account.acc_start_ref(i,username,ref)
+                    limit = user_cach[user_id]["i"]  # تعداد پردازش‌های مورد نظر
+
+                    for index, i in enumerate(files):
+                        if index >= limit:
+                            break  # اگر تعداد پردازش‌ها به حد مشخص رسید، حلقه متوقف می‌شود
+                        already_started = await db.is_bot_already_started(i, username)
+                        
+                        if already_started:
+                            await event.respond(f"❌ این سشن ({i}) قبلاً ربات {username} را استارت کرده است.")
+                            continue  # از این سشن رد می‌شویم و سراغ بعدی می‌رویم
+                        
+                        # اگر قبلاً استارت نشده بود، حالا استارت می‌کنیم
+                        respons = await account.acc_start_ref(i, username, ref)
                         
                         if respons:
                             balance = incach[0] - balanc1 
                             await db.UpdateWalletUser(user_id,balance)
+                            await db.add_start(i,username)
                             await event.respond("hi")
                         else:
                             await event.respond("by")
                     
             
-                
-                        
-                    
 
 # -------------------------------  run -------------------------------
 
