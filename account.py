@@ -18,6 +18,7 @@ async def check_status_sessions(session):
     client = TelegramClient(session, api_id, api_hash)
     
     try:
+
         await client.connect()
         
         if not await client.is_user_authorized():
@@ -25,14 +26,12 @@ async def check_status_sessions(session):
             await client.disconnect()
             return False
 
-        print(f"Session {session} is valid and authorized.")
-
-        if await client.is_connected():
-            print("Client is still connected.")
-            return True
         else:
-            print("Client got disconnected unexpectedly.")
-            return False
+            if await client.is_connected():
+                print(f"Session {session} is valid and authorized.")
+                return True
+
+        
 
     except (AuthKeyError, FileNotFoundError):
         print(f"Session {session} is invalid or corrupted.")
@@ -53,30 +52,36 @@ async def check_status_sessions(session):
         print("Client disconnected successfully.")
 
     
-    
 
-async def acc_start_ref(session,username,keyrefral):
+
+async def acc_start_ref(session, username, keyrefral):
     client = TelegramClient(session, api_id, api_hash)
-    await client.connect()
-    if not await client.is_user_authorized():
-        print("Client is not authorized. Please log in.")
-        return False
+    
+    if not client.is_connected():
+        await client.connect()
+
     try:
+
         peer = await client(ResolveUsernameRequest(username))
         print(f"Resolved Peer: {peer}")
     except Exception as e:
         print(f"Error resolving username: {e}")
         await client.disconnect()
         return False
+
     try:
         request = StartBotRequest(bot=peer.peer, peer=peer.peer, start_param=keyrefral)
         result = await client(request)
+        
         if result:
+            print("Bot started successfully!")
             return True
         else:
+            print("Failed to start bot.")
             return False
     except Exception as e:
         print(f"Error starting bot: {e}")
     
     await client.disconnect()
-    return True
+    return False
+

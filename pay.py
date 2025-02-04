@@ -21,8 +21,6 @@ def link_payment(amount: float):
     else:
         raise ConnectionError(f"Failed to connect to payment gateway. Status code: {response.status_code}")
 
-
-
 def check_status_payment(amount, x):
     response = requests.post("https://payment.zarinpal.com/pg/v4/payment/verify.json", {
         "merchant_id": merchant_id,

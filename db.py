@@ -1,5 +1,4 @@
 import aiosqlite
-import asyncio
 
 async def create_database():
     async with aiosqlite.connect("database.db") as db:
@@ -295,7 +294,7 @@ async def read_referrabot_name(botname : str):
     async with aiosqlite.connect("database.db") as conn:
         Cursor = await conn.execute("""
             SELECT botname FROM referrabots
-            WHERE botname = ?
+            WHERE username = ?
             """, (str(botname),))
         return await Cursor.fetchone()
 
@@ -319,7 +318,7 @@ async def Updatebalancereferal(botname: str, balance : float):
     async with aiosqlite.connect("database.db") as conn:
         await conn.execute(
             f"""
-                UPDATE referrabots SET balance = ? WHERE botname = ?
+                UPDATE referrabots SET balance = ? WHERE username = ?
             """,
             (float(balance),botname),
         )
@@ -327,7 +326,7 @@ async def Updatebalancereferal(botname: str, balance : float):
         
 async def delete_referrabot(botname: str):
     async with aiosqlite.connect("database.db") as db:
-        await db.execute("DELETE FROM referrabots WHERE botname = ?;", (botname,))
+        await db.execute("DELETE FROM referrabots WHERE username = ?;", (botname,))
         await db.commit()
 
 # ------------------------------- CRUD for 'accounts' Table -------------------------------
@@ -371,16 +370,6 @@ async def read_discount(code):
         async with db.execute("SELECT * FROM discount WHERE code = ?;", (code,)) as cursor:
             return await cursor.fetchone()
 
-async def update_discount(code, dateexpire=None, countallow=None, percentdis=None):
-    async with aiosqlite.connect("database.db") as db:
-        if dateexpire:
-            await db.execute("UPDATE discount SET dateexpire = ? WHERE code = ?;", (dateexpire, code))
-        if countallow:
-            await db.execute("UPDATE discount SET countallow = ? WHERE code = ?;", (countallow, code))
-        if percentdis:
-            await db.execute("UPDATE discount SET percentdis = ? WHERE code = ?;", (percentdis, code))
-        await db.commit()
-
 async def delete_discount(code):
     """حذف کد تخفیف بر اساس `code`."""
     async with aiosqlite.connect("database.db") as db:
@@ -393,33 +382,43 @@ async def delete_expired_discounts(datee):
         await db.execute("DELETE FROM discount WHERE dateexpire < ?;", (datee,))
         await db.commit()
 
-async def is_bot_already_started(db, session_id, bot_username):
+async def is_bot_already_started(session_id, bot_username):
     query = """
     SELECT 1
     FROM account_referral
-    WHERE account_ = (SELECT id FROM accounts WHERE sessions = ?)
+    WHERE account_id = (SELECT id FROM accounts WHERE sessions = ?)
       AND bot_id = (SELECT id FROM referrabots WHERE username = ?)
     """
-    result = await db.fetch_one(query, (session_id, bot_username))
+    async with aiosqlite.connect("database.db") as db:
+        async with db.execute(query, (session_id, bot_username)) as cursor:
+            result = await cursor.fetchone()
     return result is not None
 
-async def add_start(db, session_id, bot_username):
-    # پیدا کردن یا اضافه کردن سشن
-    account_id = await db.execute("""
-        INSERT OR IGNORE INTO accounts (sessions) VALUES (?)
-    """, (session_id,))
-    account_id = account_id or await db.fetch_one("SELECT id FROM accounts WHERE sessions = ?", (session_id,))
-
-    # پیدا کردن یا اضافه کردن ربات
-    bot_id = await db.execute("""
-        INSERT OR IGNORE INTO referrabots (botname, username, balance) VALUES (?, ?, 0)
-    """, ("Bot Name", bot_username))
-    bot_id = bot_id or await db.fetch_one("SELECT id FROM referrabots WHERE username = ?", (bot_username,))
-
-    # اضافه کردن به جدول واسط
-    try:
+async def add_start(session_id, bot_username):
+    async with aiosqlite.connect("database.db") as db:
         await db.execute("""
-            INSERT INTO account_referral (account_id, bot_id) VALUES (?, ?)
-        """, (account_id, bot_id))
-    except Exception as e:
-        print("این سشن قبلاً این ربات را استارت کرده:", e)
+            INSERT OR IGNORE INTO accounts (sessions) VALUES (?)
+        """, (session_id,))
+        
+        account_id = await db.execute("SELECT id FROM accounts WHERE sessions = ?", (session_id,))
+        account_id = await account_id.fetchone()
+        account_id = account_id[0] if account_id else None
+        
+        await db.execute("""
+            INSERT OR IGNORE INTO referrabots (botname, username, balance) VALUES (?, ?, 0)
+        """, ("Bot Name", bot_username))
+        
+        bot_id = await db.execute("SELECT id FROM referrabots WHERE username = ?", (bot_username,))
+        bot_id = await bot_id.fetchone()
+        bot_id = bot_id[0] if bot_id else None
+        
+        try:
+            if account_id and bot_id:
+                await db.execute("""
+                    INSERT INTO account_referral (account_id, bot_id) VALUES (?, ?)
+                """, (account_id, bot_id))
+            else:
+                print("خطا در یافتن account_id یا bot_id")
+        except Exception as e:
+            print("این سشن قبلاً این ربات را استارت کرده:", e)
+
