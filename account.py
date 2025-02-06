@@ -1,8 +1,10 @@
-from telethon import TelegramClient
+from telethon import TelegramClient,functions, types
 from telethon.tl.functions.messages import StartBotRequest
 from telethon.tl.functions.contacts import ResolveUsernameRequest
-from telethon.errors import SessionPasswordNeededError, AuthKeyError
+from telethon.errors import SessionPasswordNeededError, AuthKeyError,RPCError
 from asyncio import run
+
+
 
 api_id = 2631644
 api_hash = '2a0dec0b80b84e501c5d9806248eb235'
@@ -31,8 +33,6 @@ async def check_status_sessions(session):
                 print(f"Session {session} is valid and authorized.")
                 return True
 
-        
-
     except (AuthKeyError, FileNotFoundError):
         print(f"Session {session} is invalid or corrupted.")
         return False
@@ -57,31 +57,34 @@ async def check_status_sessions(session):
 async def acc_start_ref(session, username, keyrefral):
     client = TelegramClient(session, api_id, api_hash)
     
-    if not client.is_connected():
+    try:
         await client.connect()
-
-    try:
-
-        peer = await client(ResolveUsernameRequest(username))
-        print(f"Resolved Peer: {peer}")
-    except Exception as e:
-        print(f"Error resolving username: {e}")
-        await client.disconnect()
-        return False
-
-    try:
-        request = StartBotRequest(bot=peer.peer, peer=peer.peer, start_param=keyrefral)
-        result = await client(request)
         
-        if result:
-            print("Bot started successfully!")
-            return True
-        else:
-            print("Failed to start bot.")
+        if not await client.is_user_authorized():
+            print("Client is not authorized. Please log in first.")
+            await client.disconnect()
             return False
-    except Exception as e:
-        print(f"Error starting bot: {e}")
-    
-    await client.disconnect()
-    return False
+        x = await client.get_me()
+        print(x)
+        try:
+            peer = await client.get_entity(username)
+        except Exception as e:
+            print(f"Error resolving username: {e}")
+            return False
 
+        print(f"Resolved Peer: {peer}")
+
+        try:
+            result =await client(functions.messages.StartBotRequest(bot=username, peer=username, start_param=keyrefral))
+            
+            if result:
+                print("Bot started successfully!")
+                return True
+            else:
+                print("Failed to start bot.")
+                return False
+        except RPCError as e:
+            print(f"Error starting bot: {e}")
+            return False
+    finally:
+        await client.disconnect()
