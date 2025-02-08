@@ -4,6 +4,7 @@ import db
 import ConstText
 from socks import SOCKS5, SOCKS4, HTTP
 import os
+import json
 from asyncio import sleep
 import pay
 import  re
@@ -41,6 +42,17 @@ global user_step,user_cach
 
 user_step = {}
 user_cach={}
+
+async def read_json_file(json_file_path):
+    try:
+        with open(json_file_path, 'r', encoding='utf-8') as file:
+            data = json.load(file)
+            app_id = data.get('app_id')
+            app_hash = data.get('app_hash')
+            return app_id, app_hash
+    except Exception as e:
+        print(f"خطا در خواندن فایل JSON: {e}")
+        return None, None
 
 async def is_user_in_channel(user_id):
     channel_link = 'https://t.me/refferall_bo'
@@ -662,121 +674,144 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                 )
 
         if current_step == "get_session":
-            try:
-                file_name = event.document.mime_type
-                if "zip" in file_name:
-                    folder_path = "./newfile"
-                    os.makedirs(folder_path, exist_ok=True)
-                    path = await event.download_media(folder_path)
-
                     try:
-                        with zipfile.ZipFile(path, 'r') as zip_ref:
-                            zip_files = zip_ref.namelist()
-                            session_files = [file for file in zip_files if file.endswith('.session')]
+                        file_name = event.document.mime_type
+                        if "zip" in file_name:
+                            folder_path = "./newfile"
+                            os.makedirs(folder_path, exist_ok=True)
+                            path = await event.download_media(folder_path)
 
-                            if not session_files:
-                                await event.reply("هیچ فایل سشن (.session) درون فایل zip یافت نشد.")
-                                await log_to_channel(event, action="هیچ فایل سشن در فایل zip یافت نشد.")
-                                return
+                            try:
+                                with zipfile.ZipFile(path, 'r') as zip_ref:
+                                    zip_files = zip_ref.namelist()
+                                    session_files = [file for file in zip_files if file.endswith('.session')]
 
-                            dest_folder = "./sessions"
-                            os.makedirs(dest_folder, exist_ok=True)
-                            extracted_files = []
+                                    if not session_files:
+                                        await event.reply("هیچ فایل سشن (.session) درون فایل zip یافت نشد.")
+                                        await log_to_channel(event, action="هیچ فایل سشن در فایل zip یافت نشد.")
+                                        return
 
-                            for file in session_files:
-                                zip_ref.extract(file, folder_path)
-                                src_file = os.path.join(folder_path, file)
+                                    dest_folder = "./sessions"
+                                    os.makedirs(dest_folder, exist_ok=True)
+                                    extracted_files = []
 
-                                try:
-                                    await move_file(src_file, dest_folder)
-                                    extracted_files.append(file)
-                                except Exception as e:
-                                    await log_to_channel(event, action=f"خطا در جابجایی فایل {file}: {e}")
-                                    continue
+                                    for file in session_files:
+                                        zip_ref.extract(file, folder_path)
+                                        src_file = os.path.join(folder_path, file)
 
-                                json_file = file.replace(".session", ".json")
-                                if json_file in zip_files:
-                                    zip_ref.extract(json_file, folder_path)
-                                    src_json_file = os.path.join(folder_path, json_file)
-                                    try:
-                                        await move_file(src_json_file, dest_folder)
-                                        extracted_files.append(json_file)
-                                    except Exception as e:
-                                        await log_to_channel(event, action=f"خطا در جابجایی فایل {json_file}: {e}")
-                                        continue
+                                        try:
+                                            await move_file(src_file, dest_folder)
+                                            extracted_files.append(file)
+                                        except Exception as e:
+                                            await log_to_channel(event, action=f"خطا در جابجایی فایل {file}: {e}")
+                                            continue
 
-                            if extracted_files:
-                                    sessions_path = glob("./sessions/*.session")
+                                        json_file = file.replace(".session", ".json")
+                                        if json_file in zip_files:
+                                            zip_ref.extract(json_file, folder_path)
+                                            src_json_file = os.path.join(folder_path, json_file)
+                                            try:
+                                                await move_file(src_json_file, dest_folder)
+                                                extracted_files.append(json_file)
+                                            except Exception as e:
+                                                await log_to_channel(event, action=f"خطا در جابجایی فایل {json_file}: {e}")
+                                                continue
 
-                                    sessions = [os.path.basename(i) for i in sessions_path]
+                                    if extracted_files:
+                                            json_paths = glob("./sessions/*.json")  # پیدا کردن همه فایل‌های JSON در sessions
+                                            json_files = [os.path.basename(i) for i in json_paths]  # گرفتن نام فایل‌ها
 
-                                    if sessions:
-                                        healthy_count = 0 
-                                        broken_count = 0  
-
-                                        for file in sessions:
-                                            if file.endswith('.session'):
-                                                file_b = os.path.join(dest_folder, file) 
-                                                check_stat = await account.check_status_sessions(file) 
-
-                                                if check_stat: 
-                                                    healthy_count += 1
-                                                    today = date.today()
-                                                    to_day = today.strftime("%Y/%m/%d")
-                                                    phone_number = file.replace(".session", "") 
-
+                                            if json_files:
+                                                for jas in json_paths:  # مستقیماً روی json_paths لوپ بزنید
                                                     try:
-                                                        await db.create_account(int(phone_number), to_day)
-                                                    except sqlite3.OperationalError as e:
-                                                        await log_to_channel(event, action=f"خطای پایگاه داده هنگام ثبت حساب برای {phone_number}: {e}")
-                                                        async with client.action(event.chat_id, 'typing'):
-                                                            await asyncio.sleep(0.3)
-                                                        continue
-                                                else:  
-                                                    broken_count += 1
-                                                    os.remove(file_b)  
+                                                        with open(jas, 'r', encoding='utf-8') as js:
+                                                            data = json.load(js)
+                                                            api_id = data.get('app_id')
+                                                            api_hash = data.get('app_hash')
 
-                                        async with client.action(event.chat_id, 'typing'):
-                                            await asyncio.sleep(0.3)
-                                            await event.reply(
-                                                f"تعداد {healthy_count} سشن سالم به اکانت‌ها اضافه شد ⭐️\n"
-                                                f"تعداد {broken_count} سشن خراب است."
-                                                ,buttons = keys.key_start_sudo()
-                                            )
-                                            user_cach.pop(user_id, None)
-                                            user_step.pop(user_id, None)
-                                        await log_to_channel(
-                                            event, 
-                                            action=f"{healthy_count} سشن سالم و {broken_count} سشن خراب."
-                                        )
+                                                    except Exception as e:
+                                                        print(f"خطا در خواندن فایل {jas}: {e}")
+                                            else:
+                                                print("هیچ فایل JSONی در پوشه sessions پیدا نشد.")
+
+                                            sessions_path = glob("./sessions/*.session")
+                                            
+
+                                            sessions = [os.path.basename(i) for i in sessions_path]
+
+                                            if sessions:
+                                                healthy_count = 0
+                                                broken_count = 0
+
+                                                for file in sessions:
+                                                    if file.endswith('.session'):
+                                                        file_b = os.path.join(dest_folder, file)
+                                                        api_id = int(api_id)
+                                                        c = await db.read_account(file.replace(".session", ""))
+                                                        if c:
+                                                            pass
+
+                                                        
+                                                        else:
+                                                            check_stat = await account.check_status_sessions(file, api_id, api_hash)
+
+                                                            if check_stat:
+                                                                healthy_count += 1
+                                                                today = date.today()
+                                                                to_day = today.strftime("%Y/%m/%d")
+                                                                phone_number = file.replace(".session", "")
+
+                                                                try:
+                                                                    await db.create_account(int(phone_number), to_day, int(api_id), api_hash)
+                                                                except sqlite3.OperationalError as e:
+                                                                    await log_to_channel(event, action=f"خطای پایگاه داده هنگام ثبت حساب برای {phone_number}: {e}")
+                                                                    async with client.action(event.chat_id, 'typing'):
+                                                                        await asyncio.sleep(0.3)
+                                                                    continue
+                                                            else:
+                                                                broken_count += 1
+                                                                os.remove(file_b)
+
+                                                async with client.action(event.chat_id, 'typing'):
+                                                    await asyncio.sleep(0.3)
+                                                    await event.reply(
+                                                            f"تعداد {healthy_count} سشن سالم به اکانت‌ها اضافه شد ⭐️\n"
+                                                            f"تعداد {broken_count} سشن خراب است.",
+                                                            buttons=keys.key_start_sudo()
+                                                        )
+                                                    user_cach.pop(user_id, None)
+                                                    user_step.pop(user_id, None)
+                                                await log_to_channel(
+                                                        event,
+                                                        action=f"{healthy_count} سشن سالم و {broken_count} سشن خراب."
+                                                    )
+                                            else:
+                                                async with client.action(event.chat_id, 'typing'):
+                                                    await asyncio.sleep(0.3)
+                                                await log_to_channel(event, action="پوشه سشن خالی است.")
                                     else:
-                                        async with client.action(event.chat_id, 'typing'):
-                                            await asyncio.sleep(0.3)
-                                        await log_to_channel(event, action="پوشه سشن خالی است.")
-                            else:
-                                await log_to_channel(event, action="هیچ فایلی از فایل zip استخراج نشد.")
+                                            await log_to_channel(event, action="هیچ فایلی از فایل zip استخراج نشد.")
 
-                    except zipfile.BadZipFile:
-                        await log_to_channel(event, action="فایل zip خراب است.")
-                    
-                    finally:
-                        if os.path.exists(path):
-                            os.remove(path)
-                        if os.path.exists(folder_path):
-                            shutil.rmtree(folder_path)
-                        user_cach.pop(user_id, None)
-                        user_step.pop(user_id, None)
+                            except zipfile.BadZipFile:
+                                    await log_to_channel(event, action="فایل zip خراب است.")
 
-                else:
-                    async with client.action(event.chat_id, 'typing'):
-                        await asyncio.sleep(0.3)
-                        await event.respond("فرمت فایل اشتباه است. لطفاً یک فایل zip ارسال نمایید.")
-                    await log_to_channel(event, action="فرمت فایل ارسال شده اشتباه است. (نبودن zip)")
+                            finally:
+                                    if os.path.exists(path):
+                                        os.remove(path)
+                                    if os.path.exists(folder_path):
+                                        shutil.rmtree(folder_path)
+                                    user_cach.pop(user_id, None)
+                                    user_step.pop(user_id, None)
 
-            except Exception as e:
-                await log_to_channel(event, action=f"خطا در پردازش فایل سشن: {str(e)}")
+                        else:
+                                async with client.action(event.chat_id, 'typing'):
+                                    await asyncio.sleep(0.3)
+                                    await event.respond("فرمت فایل اشتباه است. لطفاً یک فایل zip ارسال نمایید.")
+                                await log_to_channel(event, action="فرمت فایل ارسال شده اشتباه است. (نبودن zip)")
 
-
+                    except Exception as e:
+                            await log_to_channel(event, action=f"خطا در پردازش فایل سشن: {str(e)}")
+                            
         if current_step == "user_id_neg":
             if event.text.isdigit():
                 user_id_input = event.text.replace('`','')
@@ -960,7 +995,6 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
 
                     await event.respond("شناسه کاربری وارد شده معتبر نیست. لطفا شناسه عددی وارد کنید.") 
             except Exception as e:
-           
                 await log_to_channel(
                     event,
                     action=f"خطا در مسدود کردن حساب کاربر با شناسه {user_id}. خطا: {str(e)}"

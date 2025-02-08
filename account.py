@@ -1,13 +1,7 @@
-from telethon import TelegramClient,functions, types
-from telethon.tl.functions.messages import StartBotRequest
-from telethon.tl.functions.contacts import ResolveUsernameRequest
+from telethon import TelegramClient,functions
 from telethon.errors import SessionPasswordNeededError, AuthKeyError,RPCError
 from asyncio import run
-
-
-
-api_id = 2631644
-api_hash = '2a0dec0b80b84e501c5d9806248eb235'
+from random import choice
 
 
 proxyx = {
@@ -16,7 +10,8 @@ proxyx = {
     'proxy_port': 2080  # Proxy server port
 }
 
-async def check_status_sessions(session):
+async def check_status_sessions(session, api_id,api_hash):
+
     client = TelegramClient(session, api_id, api_hash)
     
     try:
@@ -53,7 +48,8 @@ async def check_status_sessions(session):
 
     
 
-
+api_id = 2631644
+api_hash = '2a0dec0b80b84e501c5d9806248eb235'
 async def acc_start_ref(session, username, keyrefral):
     client = TelegramClient(session, api_id, api_hash)
     

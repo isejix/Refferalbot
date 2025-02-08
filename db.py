@@ -41,14 +41,16 @@ async def create_database():
             CREATE TABLE IF NOT EXISTS accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 sessions BIGINT NOT NULL UNIQUE,
-                date DATETIME
+                date DATETIME,
+                api_id BIGINT NOT NULL,
+                api_hash VARCHAR NOT NULL
             );
         """)
 
         await db.execute("""
             CREATE TABLE IF NOT EXISTS referrabots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                botname VARCHAR NOT NULL,
+                botname BIGINT NOT NULL,
                 username VARCHAR NOT NULL UNIQUE,
                 balance FLOAT NOT NULL
             );
@@ -64,8 +66,7 @@ async def create_database():
                 UNIQUE (account_id, bot_id)
             );
         """)
-
-        
+   
         await db.execute("""
             CREATE TABLE IF NOT EXISTS discount (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
