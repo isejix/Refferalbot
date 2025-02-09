@@ -178,6 +178,7 @@ def key_discouny():
     
     keyboard = [
         [Button.text("حذف تخفیف 🗑", resize=True),Button.text("ثبت تخفیف 🟢", resize=True)],
+        [Button.text("نمایش کد تخفیف 👀", resize=True)],
         [Button.text("بازگشت 🔙", resize=True)]
     ]
     return keyboard

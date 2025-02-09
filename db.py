@@ -344,6 +344,16 @@ async def read_account(date):
     async with aiosqlite.connect("database.db") as db:
         async with db.execute("SELECT * FROM accounts WHERE date = ?", (date,)) as cursor:
             await cursor.fetchone()
+
+async def read_accounts(sessions):
+    async with aiosqlite.connect("database.db") as db:
+        async with db.execute("SELECT sessions FROM accounts WHERE sessions = ?", (sessions,)) as cursor:
+            await cursor.fetchone()
+            
+async def read_accounts_api(sessions):
+    async with aiosqlite.connect("database.db") as db:
+        async with db.execute("SELECT api_id , api_hash  FROM accounts WHERE sessions = ?", (sessions,)) as cursor:
+            await cursor.fetchone()
             
 # ------------------------------- CRUD for 'dicount' Table -------------------------------
 

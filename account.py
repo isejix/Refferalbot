@@ -46,11 +46,7 @@ async def check_status_sessions(session, api_id,api_hash):
         
         print("Client disconnected successfully.")
 
-    
-
-api_id = 2631644
-api_hash = '2a0dec0b80b84e501c5d9806248eb235'
-async def acc_start_ref(session, username, keyrefral):
+async def acc_start_ref(session, username, keyrefral,api_id,api_hash):
     client = TelegramClient(session, api_id, api_hash)
     
     try:

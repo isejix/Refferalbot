@@ -14,7 +14,6 @@ import account
 import random
 import string
 from datetime import date
-from telethon.tl.types import SendMessageTypingAction
 import asyncio
 import sqlite3
 from telethon.tl.functions.channels import GetParticipantsRequest
@@ -90,12 +89,12 @@ async def log_to_channel(event, action=None):
         message += f"- نام کاربری: {username}\n"
         if action:
             message += f"- اکشن: {action}\n"
-        if event.text:
+        if hasattr(event, 'text'):  # بررسی وجود ویژگی text
             message += f"- پیام: {event.text}\n"
+        else:
+            message += "- پیام: بدون متن\n"  # یا می‌توانید این خط را حذف کنید
         await client.send_message(log_channel_id, message)
         
-        pass
-    
     except Exception as e:
         print(f"خطا در ارسال لاگ: {e}")
 
@@ -232,30 +231,30 @@ async def process(event):
                 if admin:
                     key = keys.refferal_key()
                     await event.reply(buttons = key)
-                user_cach.pop(user_id)
-                user_step.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
         
         if event.text == "انصراف ❌":
-            admin = db.ReadAdmin(user_id)
+            admin = await db.ReadAdmin(user_id)
             if admin:
                 key = keys.key_start_sudo()
                 await event.reply(buttons = key)
             else:
                 key = keys.key_start_user()
                 await event.reply(buttons = key)
-            user_cach.pop(user_id)
-            user_step.pop(user_id)
+            user_cach.pop(user_id,None)
+            user_step.pop(user_id,None)
             
         if event.text == "/start":
-            admin = db.ReadAdmin(user_id)
+            admin = await db.ReadAdmin(user_id)
             if admin:
                 key = keys.key_start_sudo()
                 await event.reply("منو اصلی ✔️",buttons = key)
             else:
                 key = keys.key_start_user()
                 await event.reply("منو اصلی ✔️",buttons = key)
-            user_cach.pop(user_id)
-            user_step.pop(user_id)
+            user_cach.pop(user_id,None)
+            user_step.pop(user_id,None)
 
         if current_step == "discount_":
             nama = user_cach[user_id]["read_balance_"]
@@ -279,8 +278,6 @@ async def process(event):
                                 price = user_cach[user_id]["price"]
                                 key = keys.key_order_ref(balance=dis,namee=nama,count=int(user_cach[user_id]['i'].replace("do_",'').replace("neg_","").replace("plus_","")))
                                 await client.send_message(user_id,ConstText.neworder.format(name, usname, ref, None,price ),buttons=key,parse_mode="HTML")
-                                user_cach.pop(user_id)
-                                user_step.pop(user_id)
                                 user_cach[user_id] = {"discount_balance":dis}
             except Exception as e:
                 await log_to_channel(event, action=f"خطا در پردازش مرحله: {e}")
@@ -310,8 +307,8 @@ async def process(event):
                                     event, 
                                     action=f"فاکتور پرداخت به مبلغ {user_cach[user_id]['cash']} تومان صادر شد. کد پرداخت: {code}"
                                 )
-                                user_step.pop(user_id)
-                                user_cach.pop(user_id)
+                                user_cach.pop(user_id,None)
+                                user_step.pop(user_id,None)
                         else:
                             await log_to_channel(
                                 event, 
@@ -351,8 +348,8 @@ async def process(event):
                 is_valid = await db.read_referrabot_name(user_cach[user_id]["nam"])
                 if is_valid:
                     if user_cach[user_id]["nam"] == "منو قبل 🔙":
-                        user_step.pop(user_id)
-                        user_cach.pop(user_id)
+                        user_cach.pop(user_id,None)
+                        user_step.pop(user_id,None)
                         keyboard = keys.refferal_key()
                         async with client.action(event.chat_id, 'typing'):
                             await asyncio.sleep(0.3)
@@ -372,8 +369,8 @@ async def process(event):
                         event,
                         action=f"کلید {user_cach[user_id]['nam']} با موفقیت حذف شد."
                     )
-                    user_step.pop(user_id)
-                    user_cach.pop(user_id)
+                    user_cach.pop(user_id,None)
+                    user_step.pop(user_id,None)
                 else:
                     await event.respond("ربات با این یوزرنیم وجود ندارد 🔴")
                     await log_to_channel(
@@ -390,8 +387,8 @@ async def process(event):
                 user_cach[user_id]["namee"] = namee
                 if user_cach[user_id]["namee"]  == "منو قبل 🔙":
                     await log_to_channel(event, "کاربر روی دکمه منو قبل 🔙 کلیک کرد")
-                    user_step.pop(user_id)
-                    user_cach.pop(user_id)
+                    user_cach.pop(user_id,None)
+                    user_step.pop(user_id,None)
                     keyboard = keys.refferal_key()
                     async with client.action(event.chat_id, 'typing'):
                         await asyncio.sleep(0.3)
@@ -452,8 +449,8 @@ f"""<blockquote>تغییر قیمت 💰</blockquote>
                                 action=f"اطلاعات ربات ذخیره شد: نام={user_cach[user_id]['name']}\nقیمت={balance}"
                             )
 
-                            user_step.pop(user_id)
-                            user_cach.pop(user_id)
+                            user_cach.pop(user_id,None)
+                            user_step.pop(user_id,None)
                     except ValueError as e:
 
                         await log_to_channel(
@@ -462,8 +459,8 @@ f"""<blockquote>تغییر قیمت 💰</blockquote>
                         )
 
                 elif event.text == "منو قبل 🔙":
-                    user_step.pop(user_id)
-                    user_cach.pop(user_id)
+                    user_cach.pop(user_id,None)
+                    user_step.pop(user_id,None)
                     keyboard = keys.refferal_key()
                     async with client.action(event.chat_id, 'typing'):
                         await asyncio.sleep(0.3)
@@ -558,8 +555,8 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                             action=f"اطلاعات ربات ذخیره شد: نام={user_cach[user_id]['name']}, یوزرنیم={user_cach[user_id]['username']}, قیمت={balance}"
                         )
 
-                        user_step.pop(user_id)
-                        user_cach.pop(user_id)
+                        user_cach.pop(user_id,None)
+                        user_step.pop(user_id,None)
                     except ValueError as e:
 
                         await log_to_channel(
@@ -646,8 +643,8 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                                 action=f"مقدار {charge_amount} تومان به حساب کاربر {stored_user_id} اضافه شد."
                             )
 
-                            user_step.pop(user_id)
-                            user_cach.pop(user_id)
+                            user_cach.pop(user_id,None)
+                            user_step.pop(user_id,None)
                         else:
                             await log_to_channel(
                                 event,
@@ -718,11 +715,11 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                                                 continue
 
                                     if extracted_files:
-                                            json_paths = glob("./sessions/*.json")  # پیدا کردن همه فایل‌های JSON در sessions
-                                            json_files = [os.path.basename(i) for i in json_paths]  # گرفتن نام فایل‌ها
+                                            json_paths = glob("./sessions/*.json")
+                                            json_files = [os.path.basename(i) for i in json_paths] 
 
                                             if json_files:
-                                                for jas in json_paths:  # مستقیماً روی json_paths لوپ بزنید
+                                                for jas in json_paths:
                                                     try:
                                                         with open(jas, 'r', encoding='utf-8') as js:
                                                             data = json.load(js)
@@ -865,8 +862,8 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                                     event,
                                     action=f"موجودی ناکافی برای کسر {charge_amount} از حساب کاربر {stored_user_id}."
                                 )
-                                user_cach.pop(user_id)
-                                user_step.pop(user_id)
+                                user_cach.pop(user_id,None)
+                                user_step.pop(user_id,None)
                                 return
                             await db.UpdateWalletUser(stored_user_id, new_balance)
                             keyboard = keys.key_charg_user()
@@ -883,8 +880,8 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                                 action=f"مقدار {charge_amount} از حساب کاربر {stored_user_id} با موفقیت کسر شد."
                             )
 
-                            user_step.pop(user_id)
-                            user_cach.pop(user_id)
+                            user_cach.pop(user_id,None)
+                            user_step.pop(user_id,None)
                         else:
                             await event.reply("خطا در دریافت موجودی کاربر. لطفا دوباره تلاش کنید.")
                     
@@ -927,8 +924,8 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                         event,
                         action=f"حساب کاربری {user_cach[user_id]['user']} با موفقیت حذف شد."
                     )
-                    user_step.pop(user_id)
-                    user_cach.pop(user_id)
+                    user_cach.pop(user_id,None)
+                    user_step.pop(user_id,None)
 
                 else:
                
@@ -963,8 +960,8 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                         action=f"حساب شارژ کاربر با شناسه {user_cach[user_id]['user']} با موفقیت حذف شد."
                     )
              
-                    user_step.pop(user_id)
-                    user_cach.pop(user_id)
+                    user_cach.pop(user_id,None)
+                    user_step.pop(user_id,None)
                 else:
                     await event.respond("شناسه کاربری وارد شده معتبر نیست. لطفا یک شناسه عددی وارد کنید.")
 
@@ -989,8 +986,8 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                         event,
                         action=f"حساب کاربر با شناسه {user} با موفقیت مسدود شد."
                     )
-                    user_cach.pop(user_id)
-                    user_step.pop(user_id)
+                    user_cach.pop(user_id,None)
+                    user_step.pop(user_id,None)
                 else:
 
                     await event.respond("شناسه کاربری وارد شده معتبر نیست. لطفا شناسه عددی وارد کنید.") 
@@ -1015,8 +1012,8 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                         event,
                         action=f"حساب کاربر با شناسه {user_id} با موفقیت رفع مسدودیت شد."
                     )
-                    user_cach.pop(user_id)
-                    user_step.pop(user_id)   
+                    user_cach.pop(user_id,None)
+                    user_step.pop(user_id,None) 
                 else:
                     await event.respond("شناسه کاربری وارد شده معتبر نیست. لطفاً یک شناسه عددی وارد کنید.")  
             except Exception as e:
@@ -1037,8 +1034,8 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                     if inus:
                         await db.delete_discount(del_discount)
                         await client.send_message(user_id,ConstText.del_discount,buttons=keys.key_discouny(),parse_mode="HTML")
-                        user_cach.pop(user_id)
-                        user_step.pop(user_id)
+                        user_cach.pop(user_id,None)
+                        user_step.pop(user_id,None)
                     else:
                         await event.reply("مقدار ورودی اشتباه است ❗️")
             except Exception as e:
@@ -1092,8 +1089,8 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                         dateexpire = user_cach[user_id]["dateexpire"] 
                         await db.create_discount(code,dateexpire,countallow,countallow,discount)
                         await client.send_message(user_id,ConstText.discount.format(code,dateexpire,discount,countallow),buttons=keys.key_discouny(),parse_mode="HTML")
-                        user_cach.pop(user_id)
-                        user_step.pop(user_id)
+                        user_cach.pop(user_id,None)
+                        user_step.pop(user_id,None)
                         
                 else:
                     await event.reply("مقدار ورودی اشتباه است لطفا عدد به عنوان مقدار وارد کنید ❗️")
@@ -1134,8 +1131,8 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                     action=f"پیام همگانی با موفقیت ارسال شد: {message_text[:50]}..."  # نمایش 50 کاراکتر اول پیام
                 )   
                 # پاک کردن اطلاعات از کش
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
 
             except Exception as e:
                 # ارسال لاگ برای هر نوع خطا که در روند اجرا پیش می‌آید
@@ -1149,6 +1146,7 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                 event, 
                 action=f"خطا در: {str(e)}"
             )   
+            
 # -------------------------------  user -------------------------------
                         
 @client.on(events.NewMessage(pattern="افزایش موجودی 👛"))
@@ -1156,8 +1154,8 @@ async def update_card(event):
     global user_step,user_cach
     user_id = event.sender_id
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -1196,8 +1194,8 @@ async def update_card(event):
     global user_cach,user_step
     user_id = event.sender_id
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -1228,16 +1226,15 @@ async def update_card(event):
     except Exception as e:
         await log_to_channel(
             event,
-            action=f"خطا در پردازش درخواست خدمات ویژه برای کاربر {user_id}: {str(e)}"
-        )
-
+            action=f"خطا در پردازش درخواست خدمات ویژه برای کاربر {user_id}: {str(e)}")
+        
 @client.on(events.NewMessage(pattern="💵 درگاه بانکی"))
 async def pay_dargah(event):
     global user_step,user_cach
     user_id = event.sender_id
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -1278,8 +1275,8 @@ async def update_card(event):
     global user_cach,user_step
     user_id = event.sender_id
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -1310,16 +1307,15 @@ async def update_card(event):
     except Exception as e:
         await log_to_channel(
             event,
-            action=f"خطا در پردازش درخواست پرداخت مستقیم برای کاربر {user_id}: {str(e)}"
-        )
+            action=f"خطا در پردازش درخواست پرداخت مستقیم برای کاربر {user_id}: {str(e)}")
                
 @client.on(events.NewMessage(pattern="قوانین و راهنما 💡"))
 async def rule_bot(event):
     global user_step,user_cach
     user_id = event.sender_id
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
 
@@ -1362,8 +1358,8 @@ async def order_bot(event):
     global user_cach,user_step
     user_id = event.sender_id
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
 
@@ -1441,8 +1437,8 @@ async def news_bot(event):
     global user_step,user_cach
     user_id = event.sender_id
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -1475,8 +1471,8 @@ async def support_bot(event):
     global user_cach,user_step
     user_id = event.sender_id
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
 
@@ -1512,8 +1508,8 @@ async def user_detail_bot(event: events.NewMessage.Event):
     global user_step,user_cach
     user_id = event.sender_id
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -1575,8 +1571,8 @@ async def backmenohandeler(event):
                 action=f"عملیات کنسل شد توسط کاربر {user_id}."
             )
         
-        user_cach.pop(user_id)
-        user_step.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
 
     except Exception as e:
         await log_to_channel(
@@ -1602,8 +1598,8 @@ async def backmenotexthandeler(event):
         async with client.action(event.chat_id, 'typing'):
                     await asyncio.sleep(0.3)
                     await event.reply("به منو اصلی بازگشتید 🔙", buttons=keyboard)
-    user_step.pop(user_id)
-    user_cach.pop(user_id)
+    user_cach.pop(user_id,None)
+    user_step.pop(user_id,None)
 
 @client.on(events.NewMessage(pattern="منو قبل 🔙"))
 async def backmeno(event):
@@ -1623,8 +1619,8 @@ async def backmeno(event):
         async with client.action(event.chat_id, 'typing'):
                     await asyncio.sleep(0.3)
                     await event.respond("به منو قبلی بازگشتید 🔙", buttons=keyboard)
-    user_cach.pop(user_id)
-    user_step.pop(user_id)
+    user_cach.pop(user_id,None)
+    user_step.pop(user_id,None)
     
 pattern = r'https://t\.me/([\w\d_]+)/[\w\d_]+\?startapp=([\w\d=%_]+)'
 
@@ -1634,8 +1630,8 @@ async def handler(event):
     user_id = event.sender.id
     message = event.message.text
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     try:
         user = await db.ReadUserByUserId(user_id)
@@ -1706,8 +1702,8 @@ async def update_card(event):
     global user_step,user_cach
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     try:
         admin = await db.ReadAdmin(user_id)
@@ -1735,15 +1731,13 @@ async def update_card(event):
             action=f"خطا در پردازش درخواست برای کاربر {user_id}: {str(e)}"
         )
 
-
-
 @client.on(events.NewMessage(pattern="آپلود سشن 📤"))
 async def update_card(event):
     global user_step, user_cach
     user_id = event.sender_id
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -1790,8 +1784,8 @@ async def send_message_channel(event: events.NewMessage.Event):
     user_id = event.sender_id
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     try:
         # بررسی اینکه آیا کاربر ادمین است
@@ -1847,8 +1841,8 @@ async def charge_account(event: events.NewMessage.Event):
     global user_step, user_cach
     user_id = event.sender_id
     if user_id in user_step:
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
                 return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -1883,8 +1877,8 @@ async def charge_account(event: events.NewMessage.Event):
     global user_step, user_cach
     user_id = event.sender_id
     if user_id in user_step:
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
                 return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -1918,8 +1912,8 @@ async def charge_account(event: events.NewMessage.Event):
     global user_step, user_cach
     user_id = event.sender_id
     if user_id in user_step:
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
                 return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -1955,8 +1949,8 @@ async def charge_account(event: events.NewMessage.Event):
     global user_step, user_cach
     user_id = event.sender_id
     if user_id in user_step:
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
                 return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
 
@@ -1991,8 +1985,8 @@ async def charge_account(event: events.NewMessage.Event):
     global user_step, user_cach
     user_id = event.sender_id
     if user_id in user_step:
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
                 return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -2031,8 +2025,8 @@ async def charge_account(event: events.NewMessage.Event):
     global user_step, user_cach
     user_id = event.sender_id
     if user_id in user_step:
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
                 return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -2067,8 +2061,8 @@ async def charge_account(event: events.NewMessage.Event):
     global user_step, user_cach
     user_id = event.sender_id
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -2103,8 +2097,8 @@ async def log(event: events.NewMessage.Event):
     user_id = event.sender_id
     admin = await db.ReadAdmin(user_id)
     if user_id in user_step:
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
                 return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     if admin:
@@ -2168,8 +2162,8 @@ async def update_balance(event):
     if admin:
         try:
             if user_id in user_step:
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
                 await log_to_channel(event, action=f"وضعیت قبلی برای ادمین {user_id} پاکسازی شد.")
                 return
 
@@ -2190,8 +2184,8 @@ async def start_create_referrabot(event):
     user_id = event.sender_id
     global user_step, user_cach
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -2218,8 +2212,7 @@ async def start_create_referrabot(event):
     except Exception as e:
         await log_to_channel(
             event,
-            action=f"خطا در پردازش درخواست ساخت کلید برای کاربر {user_id}: {str(e)}"
-        )
+            action=f"خطا در پردازش درخواست ساخت کلید برای کاربر {user_id}: {str(e)}")
 
 @client.on(events.NewMessage(pattern="➖ حذف کلید 🔑"))
 async def delete_refferal_bot(event):
@@ -2230,8 +2223,8 @@ async def delete_refferal_bot(event):
     if admin:
         try:
             if user_id in user_step:
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
                 return
             user_step[user_id] = "nam"
             user_cach[user_id] = {}
@@ -2253,8 +2246,8 @@ async def show_ref_bot(event):
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     if admin:
         if user_id in user_step:
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
                 return
         referal_list = await db.read_referrabots()
         if not referal_list:
@@ -2302,8 +2295,8 @@ async def start_create_referrabot(event):
     user_id = event.sender_id
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     try:
         AnyAdmin = await db.ReadAdmin(user_id)
@@ -2317,22 +2310,20 @@ async def start_create_referrabot(event):
             
             await log_to_channel(
                 event,
-                action=f"کاربر {user_id} سعی کرده به بخش ارسال پیام همگانی دسترسی پیدا کند اما ادمین نبوده است."
-            )
+                action=f"کاربر {user_id} سعی کرده به بخش ارسال پیام همگانی دسترسی پیدا کند اما ادمین نبوده است.")
     
     except Exception as e:
         await log_to_channel(
             event,
-            action=f"خطا در پردازش درخواست ارسال پیام همگانی برای کاربر {user_id}: {str(e)}"
-        )
+            action=f"خطا در پردازش درخواست ارسال پیام همگانی برای کاربر {user_id}: {str(e)}")
             
 @client.on(events.NewMessage(pattern="ثبت تخفیف 🟢"))
 async def start_create_referrabot(event):
     user_id = event.sender_id
     global user_step, user_cach
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -2368,8 +2359,8 @@ async def start_create_referrabot(event):
     user_id = event.sender_id
     global user_step, user_cach
     if user_id in user_step:
-        user_step.pop(user_id)
-        user_cach.pop(user_id)
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
         return
     await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
     try:
@@ -2395,11 +2386,48 @@ async def start_create_referrabot(event):
     except Exception as e:
         await log_to_channel(
             event,
-            action=f"خطا در پردازش درخواست ساخت کلید برای کاربر {user_id}: {str(e)}"
-        )
+            action=f"خطا در پردازش درخواست ساخت کلید برای کاربر {user_id}: {str(e)}")
+        
+@client.on(events.NewMessage(pattern="نمایش کد تخفیف 👀"))
+async def start_create_referrabot(event):
+    user_id = event.sender_id
+    global user_step, user_cach
+    if user_id in user_step:
+        user_cach.pop(user_id,None)
+        user_step.pop(user_id,None)
+        return
+    await log_to_channel(event, action=f"کاربر روی دکمه {event.text}")
+    try:
+        admin = await db.ReadAdmin(user_id)
+        if admin:
+            d = await db.read_discounts()
+            if d:
+                message = "کد تخفیف ها 👇🏻\n\n"
+                for i in d:
+                    name = i[1]
+                    extime = i[2]
+                    per = i[5]
+                    message += f"🔹 کد: `{name}`\n   تاریخ انقضا: {extime}\n   درصد: {per}%\n\n" 
+                keyboard = keys.key_discouny()
+                await client.send_message(user_id,message, buttons=keyboard,parse_mode="markdown") 
+            else:
+                await event.reply("هیچ کد تخفیفی موجود نیست.")
+            user_cach.pop(user_id,None)
+            user_step.pop(user_id,None)
+        else:
+            await event.respond("شما دسترسی لازم برای انجام این عمل را ندارید.")
+            await log_to_channel(
+                event,
+                action=f"کاربر {user_id} بدون دسترسی سعی کرده فرآیند ساخت کلید را آغاز کند."
+            )
+
+    except Exception as e:
+        await log_to_channel(
+            event,
+            action=f"خطا در پردازش درخواست ساخت کلید برای کاربر {user_id}: {str(e)}")      
            
 # -------------------------------  callback -------------------------------
-            
+        
 @client.on(events.CallbackQuery)
 async def callback_handler(event):
     user_id = event.sender.id
@@ -2435,8 +2463,8 @@ async def callback_handler(event):
                         await event.respond(f"مقدار {int(float(amount))} به کیف پول شما اضاف شد 🤑")
                     await log_to_channel(event, action=f"پرداخت موفق برای کاربر {user_id}: مبلغ {amount} تومان اضافه شد.")
                     
-                    user_cach.pop(user_id)
-                    user_step.pop(user_id)
+                    user_cach.pop(user_id,None)
+                    user_step.pop(user_id,None)
 
                 elif "error not active" in response:
                     async with client.action(event.chat_id, 'typing'):
@@ -2454,8 +2482,9 @@ async def callback_handler(event):
             pass
     
     order_step = user_step.get(user_id)
-
+    
     if "read_balance_" in order_step:
+        
         name = order_step.replace("read_balance_", "")
         user_cach[user_id].update({"read_balance_": name})
         
@@ -2520,17 +2549,17 @@ async def callback_handler(event):
             await log_to_channel(event, action=f"کاربر {user_id} مقدار {i} را برای ربات {name} تنظیم کرد.")
                   
         elif "accept_order" in data:
-            balanc = await db.read_balance_referrabotbyname(name)
             balanc1 = user_cach[user_id]["lastbalance"]
             incach = await db.ReadWalletUser(user_id)
             
             if incach[0] <= balanc1 :
                 await log_to_channel(event, action=f"کاربر {user_id} تلاش کرده برای ربات {name} پرداخت انجام دهد اما موجودی کافی ندارد.")
                 await event.edit("💰 اعتبار شما کافی نیست بعد از شارژ اعتبار دوباره اقدام کنید")
-                user_step.pop(user_id)
-                user_cach.pop(user_id)
+                user_cach.pop(user_id,None)
+                user_step.pop(user_id,None)
                 
             else:
+                await event.respond("عملیات در حال انجام است ⏳\nممکن است مقداری طول بکشد ⚠️")
                 username =user_cach[user_id]["usname"].replace("https://t.me/","")
                 ref = user_cach[user_id]["ref"]
                 file = "./session"
@@ -2551,16 +2580,20 @@ async def callback_handler(event):
                             await event.respond(f"❌ این سشن ({i}) قبلاً ربات {username} را استارت کرده است.")
                             continue
                         
-                        respons = await account.acc_start_ref(i, username, ref)
-                        
-                        if respons:
+                        x = await db.read_accounts(i.replace(".session",""))
+                        if x:
+                            result = await db.read_accounts_api(i.replace(".session",""))
+                            if result:
+                                api_id, api_hash = result
+                                respons = await account.acc_start_ref(i, username, ref,api_id,api_hash)
+                    if respons:
                             balance = incach[0] - balanc1 
                             await db.UpdateWalletUser(user_id,balance)
                             await db.add_start(i,username)
-                            await event.respond("hi")
+                            await event.respond("عملیات باموفقیت انجام شد✅")
 #TODO last key to set order
 
-                        else:
+                    else:
                             await event.respond("by")
                     
             
