@@ -368,15 +368,30 @@ async def create_discount(code: str, dateexpire:str, countallow:int,countuse:int
             (code, dateexpire, countallow,countuse, percentdis),
         )
         await db.commit()
+        
+async def update_discount(code: str):
+    async with aiosqlite.connect("database.db") as db:
+        cursor = await db.execute("SELECT countuse FROM discount WHERE code = ?", (code,))
+        result = await cursor.fetchone()
+        
+        if result:
+            current_count = result[0] if result[0] else 0
+            if current_count > 0:
+                new_count = current_count - 1
+                await db.execute(
+                    """
+                    UPDATE discount SET countuse = ? WHERE code = ?
+                    """,
+                    (new_count, code),
+                )
+                await db.commit()
 
 async def read_discounts():
-    """دریافت تمامی کدهای تخفیف."""
     async with aiosqlite.connect("database.db") as db:
         async with db.execute("SELECT * FROM discount;") as cursor:
             return await cursor.fetchall()
 
 async def read_discount(code):
-    """دریافت اطلاعات کد تخفیف بر اساس `code`."""
     async with aiosqlite.connect("database.db") as db:
         async with db.execute("SELECT * FROM discount WHERE code = ?;", (code,)) as cursor:
             return await cursor.fetchone()

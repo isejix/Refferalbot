@@ -268,17 +268,25 @@ async def process(event):
                     
                     toda = get_persian_date()
                     if discount_:
-                            dates = discount_[2]
-                            if  dates != toda:
-                                di = discount_[5]
-                                dis = apply_discount(balanc,di)
-                                name = user_cach[user_id]["name"]
-                                usname = user_cach[user_id]["usname"]
-                                ref = user_cach[user_id]["ref"]
-                                price = user_cach[user_id]["price"]
-                                key = keys.key_order_ref(balance=dis,namee=nama,count=int(user_cach[user_id]['i'].replace("do_",'').replace("neg_","").replace("plus_","")))
-                                await client.send_message(user_id,ConstText.neworder.format(name, usname, ref, None,price ),buttons=key,parse_mode="HTML")
-                                user_cach[user_id] = {"discount_balance":dis}
+                        dates = discount_[2]
+                        
+                        if dates < toda:
+                            await db.delete_expired_discounts(dates)
+                            await event.respond("❌ این کد تخفیف منقضی شده است و دیگر قابل استفاده نیست.")
+                        else:
+                            di = discount_[5]
+                            dis = apply_discount(balanc, di)
+                            name = user_cach[user_id]["name"]
+                            usname = user_cach[user_id]["usname"]
+                            ref = user_cach[user_id]["ref"]
+                            price = user_cach[user_id]["price"]
+                            key = keys.key_order_ref(balance=dis, namee=nama, count=int(user_cach[user_id]['i'].replace("do_", '').replace("neg_", "").replace("plus_", "")))
+
+                            await client.send_message(user_id, ConstText.neworder.format(name, usname, ref, None, price), buttons=key, parse_mode="HTML")
+
+                            user_cach[user_id] = {"discount_balance": dis}
+                            await db.update_discount(x)  # کاهش مقدار countuse
+
             except Exception as e:
                 await log_to_channel(event, action=f"خطا در پردازش مرحله: {e}")
            
@@ -682,9 +690,14 @@ f"""<blockquote>ثبت ربات جدید 🤖</blockquote>
                                 with zipfile.ZipFile(path, 'r') as zip_ref:
                                     zip_files = zip_ref.namelist()
                                     session_files = [file for file in zip_files if file.endswith('.session')]
+                                    js_files = [file for file in zip_files if file.endswith('.json')]
 
                                     if not session_files:
                                         await event.reply("هیچ فایل سشن (.session) درون فایل zip یافت نشد.")
+                                        await log_to_channel(event, action="هیچ فایل سشن در فایل zip یافت نشد.")
+                                        return
+                                    if not js_files:
+                                        await event.reply("هیچ فایل سشن (.json) درون فایل zip یافت نشد.")
                                         await log_to_channel(event, action="هیچ فایل سشن در فایل zip یافت نشد.")
                                         return
 
